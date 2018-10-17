@@ -1,0 +1,49 @@
+﻿<Window x:Class="新纵撕检测.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:forms="clr-namespace:System.Windows.Forms;assembly=System.Windows.Forms"
+        xmlns:ui="clr-namespace:UIControl;assembly=UIControl"
+        xmlns:local="clr-namespace:新纵撕检测"
+        mc:Ignorable="d"
+        Title="纵撕检测系统下位机">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="30"/>
+            <RowDefinition/>
+        </Grid.RowDefinitions>
+        <Grid>
+            <!-- 标题栏-->
+            <Grid Background="Orchid" Grid.Row="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition/>
+                    <ColumnDefinition Width="80"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="30"/>
+                </Grid.RowDefinitions>
+                <WrapPanel VerticalAlignment="Stretch">
+                    <Label Content="{Binding Biz.DetectState}" />
+                    <Label Content="权限代码: "/>
+                    <TextBox Width="50"/>
+                </WrapPanel>
+            </Grid>
+        </Grid>
+        <Grid Grid.Row="1">
+            <StackPanel Orientation="Horizontal">
+                <WindowsFormsHost Width="200">
+                    <forms:PropertyGrid x:Name="PropertyGrid" Width="200" SelectedObject="Biz"/>
+                </WindowsFormsHost>
+                <WindowsFormsHost x:Name="formhost" Width="640" Height="480" VerticalAlignment="Top" HorizontalAlignment="Left">
+                    <forms:PictureBox x:Name="PreviewBox" Height="480" Width="640"></forms:PictureBox>
+                </WindowsFormsHost>
+                <!--<Image Name="imageC" Width="640" Height="480" HorizontalAlignment="Left" VerticalAlignment="Top" Source="{Binding Biz.PreviewImage}" MouseMove="Image_MouseMove" />-->
+
+                <!--<Border BorderBrush="Red" BorderThickness="2"  Height="64"  Width="64" Margin="{Binding Biz.Margin}" HorizontalAlignment="Left" VerticalAlignment="Top"/>-->
+                <!--<ui:MainUIControl x:Name="MainUI"/>-->
+            </StackPanel>
+         </Grid>
+
+    </Grid>
+</Window>

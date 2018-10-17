@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.27703.2047
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "新纵撕检测", "新纵撕检测\新纵撕检测.csproj", "{30559711-A889-44A4-9925-50380180198B}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+		ReleaseRemote|Any CPU = ReleaseRemote|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{30559711-A889-44A4-9925-50380180198B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{30559711-A889-44A4-9925-50380180198B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{30559711-A889-44A4-9925-50380180198B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{30559711-A889-44A4-9925-50380180198B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{30559711-A889-44A4-9925-50380180198B}.ReleaseRemote|Any CPU.ActiveCfg = ReleaseRemote|Any CPU
+		{30559711-A889-44A4-9925-50380180198B}.ReleaseRemote|Any CPU.Build.0 = ReleaseRemote|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {DDA8169E-1D1E-471C-A45F-CB6C0DD52863}
+	EndGlobalSection
+EndGlobal
