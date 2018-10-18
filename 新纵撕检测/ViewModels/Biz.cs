@@ -4,6 +4,7 @@ using MVSDK;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Drawing;
 using System.Drawing.Imaging;
@@ -28,6 +29,16 @@ namespace 新纵撕检测.ViewModels
         public bool DetectFlag { get; private set; } = true;
         public bool IsAlarm { get; set; }
         public ConcurrentQueue<Image<Bgr, Byte>> ImageQueue { get; set; } = new ConcurrentQueue<Image<Bgr, byte>>();
+        private ObservableCollection<AlarmRecord> alarms;
+        public ObservableCollection<AlarmRecord> Alarms
+        {
+            get { return alarms; }
+            set
+            {
+                alarms = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("Alarms"));
+            }
+        }
         private BitmapImage previewImage;
         public BitmapImage PreviewImage {
             get { return previewImage; }
@@ -61,7 +72,7 @@ namespace 新纵撕检测.ViewModels
         }
         private int CapCount;
 
-        System.Windows.Forms.PictureBox pictureBox;
+        private PictureBox pictureBox;
         private PropertyGrid propertyGrid;
 
         public DetectParam detectParam { get; set; }
@@ -90,6 +101,7 @@ namespace 新纵撕检测.ViewModels
                 InitLocalCamera();
             }
             Algorithm.svm_start();
+            Alarms = new ObservableCollection<AlarmRecord>();
             StartDetect();
         }
         ~Biz()
@@ -147,35 +159,47 @@ namespace 新纵撕检测.ViewModels
                                 }
                             });
 
-                            TimeSpan maxDuration = FindMaxDuration();
-                            DateTime latestTime = FindLatestTime();
+                            if (detectResultStatistics.Count > 0)
+                            {
+                                int avgX = 0;
+                                TimeSpan maxDuration = FindMaxDuration(out avgX);
+                                DateTime latestTime = FindLatestTime();
 
-                            TimeSpan maxErrorTime = TimeSpan.FromSeconds(1);
-                            TimeSpan maxHurtTime = TimeSpan.FromSeconds(0.2);
-                            TimeSpan maxDivTime = TimeSpan.FromSeconds(0.1);
-                            if (DateTime.Now - latestTime > maxErrorTime)
-                            {
-                                DetectState = DetectResultState.皮带正常;
-                                detectResultStatistics.Clear();
-                                DrawRectOnScreen(-100, -100);
+                                TimeSpan maxErrorTime = TimeSpan.FromSeconds(1);
+                                TimeSpan maxHurtTime = TimeSpan.FromSeconds(1.0);
+                                TimeSpan maxDivTime = TimeSpan.FromSeconds(0.5);
+                                if (DateTime.Now - latestTime > maxErrorTime)
+                                {
+                                    DetectState = DetectResultState.皮带正常;
+                                    detectResultStatistics.Clear();
+                                    //DrawRectOnScreen(-100, -100);
+                                }
+                                else if (maxDuration > maxHurtTime)//逻辑判断有超过maxHurtTime时间,此时发生撕伤警报
+                                {
+                                    DetectState = DetectResultState.撕伤;
+                                    //AddAlarmToStatistics(avgX);
+                                }
+                                else if (maxDuration > maxDivTime)//逻辑判断有超过maxDivTime时间,此时发生撕裂警报
+                                {
+                                    DetectState = DetectResultState.撕裂;
+                                }
+                                FrameCount++;
                             }
-                            else if (maxDuration > maxHurtTime)//逻辑判断有超过maxHurtTime时间,此时发生撕伤警报
-                            {
-                                DetectState = DetectResultState.撕伤;
-                                //pen = new Pen(Color.Red, 5);//宽度为5的红色笔
-                            }
-                            else if (maxDuration > maxDivTime)//逻辑判断有超过maxDivTime时间,此时发生撕裂警报
-                            {
-                                DetectState = DetectResultState.撕裂;
-                                //pen = new Pen(Color.Yellow, 3);//宽度为3的红色笔
-                            }
-                            FrameCount++;
                         }
                     });
 
                     Thread.Sleep(10);
                 }
             });
+        }
+
+        private void AddAlarmToStatistics(int avgX)
+        {
+            App.Current.Dispatcher.Invoke(() =>
+            {
+                Alarms.Add(new AlarmRecord { CreatedTime = DateTime.Now, XPos = avgX });
+            });
+            
         }
 
         private DateTime FindLatestTime()
@@ -192,20 +216,23 @@ namespace 新纵撕检测.ViewModels
             return latestTime;
         }
 
-        private TimeSpan FindMaxDuration()
+        private TimeSpan FindMaxDuration(out int avgX)
         {
             //撕裂点最长的时间
             TimeSpan maxDuration = TimeSpan.Zero;
+            int xSum = 0;
             //遍历查找计时最长的撕裂点记录
             DetectResultStatistic detectResultStatistic = null;
             foreach (var item in detectResultStatistics)
             {
+                xSum += item.Value.xPos;
                 if (DateTime.Now - item.Value.beginTimeStamp > maxDuration)
                 {
                     maxDuration = DateTime.Now - item.Value.beginTimeStamp;
                     detectResultStatistic = item.Value;
                 }
             }
+            avgX = xSum / detectResultStatistics.Count;
             return maxDuration;
         }
 
@@ -339,10 +366,10 @@ namespace 新纵撕检测.ViewModels
                     using (MemoryStream stream = new MemoryStream())
                     {
                         Image.Bitmap.Save(stream, ImageFormat.Bmp);
-                        App.Current.Dispatcher.Invoke(() =>
-                        {
-                            //SetPreviewImage(stream);
-                        });
+                        //App.Current.Dispatcher.Invoke(() =>
+                        //{
+                        //    //SetPreviewImage(stream);
+                        //});
                     }
                     ImageQueue.Enqueue(Image);
                     CapCount++;
@@ -379,12 +406,24 @@ namespace 新纵撕检测.ViewModels
             this.PreviewImage = PreviewImage;
         }
 
-        Pen pen;
         public void DrawRectOnScreen(double posX, double posY)
         {
             Margin = new System.Windows.Thickness(posX-32, posY-32, 0, 0);
             Rectangle rect = new Rectangle((int)posX - 32, (int)posY - 32, 64, 64);
-            pen = new Pen(Color.Red, 5);//宽度为3的红色笔
+            Pen pen= new Pen(Color.WhiteSmoke, 3);
+            switch (DetectState)
+            {
+                case DetectResultState.撕伤:
+                    pen = new Pen(Color.Red, 5);
+                    break;
+                case DetectResultState.撕裂:
+                    pen = new Pen(Color.Yellow, 4);
+                    break;
+                case DetectResultState.皮带正常:
+                    break;
+                default:
+                    break;
+            }
             App.Current.Dispatcher.Invoke(() => {
                 Graphics.FromHwnd(pictureBox.Handle).DrawRectangle(pen, rect);//paintHandle对象提供了画图形的方法，我们只需调用即可
             });

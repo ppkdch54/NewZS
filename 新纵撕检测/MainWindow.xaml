@@ -38,6 +38,27 @@
                 <WindowsFormsHost x:Name="formhost" Width="640" Height="480" VerticalAlignment="Top" HorizontalAlignment="Left">
                     <forms:PictureBox x:Name="PreviewBox" Height="480" Width="640"></forms:PictureBox>
                 </WindowsFormsHost>
+                <ListView Name="HistoryHurts" ItemsSource="{Binding Biz.Alarms}" Grid.Column="1" Width="Auto" HorizontalAlignment="Right" VerticalAlignment="Top">
+                    <ListView.View>
+                        <GridView>
+                            <GridViewColumn Header="水平坐标" DisplayMemberBinding="{Binding XPos}" />
+                            <GridViewColumn Header="皮带坐标" DisplayMemberBinding="{Binding YPos}" />
+                            <GridViewColumn Header="伤长(m)" DisplayMemberBinding="{Binding Length}" />
+                            <GridViewColumn Header="首次记录" DisplayMemberBinding="{Binding CreatedTime}" />
+                            <GridViewColumn Header="最新记录" DisplayMemberBinding="{Binding LatestOccurTime}" />
+                        </GridView>
+                    </ListView.View>
+                    <!--<ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Path=CurrentAlarm}" Value="True">
+                                    <Setter Property="Background" Value="Red" />
+                                    <Setter Property="Foreground" Value="Yellow"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ListView.ItemContainerStyle>-->
+                </ListView>
                 <!--<Image Name="imageC" Width="640" Height="480" HorizontalAlignment="Left" VerticalAlignment="Top" Source="{Binding Biz.PreviewImage}" MouseMove="Image_MouseMove" />-->
 
                 <!--<Border BorderBrush="Red" BorderThickness="2"  Height="64"  Width="64" Margin="{Binding Biz.Margin}" HorizontalAlignment="Left" VerticalAlignment="Top"/>-->
