@@ -7,10 +7,10 @@
         xmlns:ui="clr-namespace:UIControl;assembly=UIControl"
         xmlns:local="clr-namespace:新纵撕检测"
         mc:Ignorable="d"
-        Title="纵撕检测系统下位机">
+        Title="纵撕检测系统下位机" HorizontalContentAlignment="Stretch">
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="30"/>
+            <RowDefinition Height="27"/>
             <RowDefinition/>
         </Grid.RowDefinitions>
         <Grid>
@@ -20,25 +20,31 @@
                     <ColumnDefinition/>
                     <ColumnDefinition Width="80"/>
                 </Grid.ColumnDefinitions>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="30"/>
-                </Grid.RowDefinitions>
                 <WrapPanel VerticalAlignment="Stretch">
-                    <Label Content="{Binding Biz.DetectState}" />
+                    
                     <Label Content="权限代码: "/>
-                    <TextBox Width="50"/>
+                    <TextBox Name="CMD" Width="50" TextChanged="TextBox_TextChanged"/>
+                    <WrapPanel Name="btnGroup" VerticalAlignment="Center">
+                        <Button Name="btnSerial" Content="串口参数" Click="SwitchSerialParam"/>
+                        <Button Name="btnDetect" Content="检测参数" Click="SwitchDetectParam"/>
+                        <Button Name="btnAlarm" Content="警报参数" Click="SwitchAlarmParam"/>
+                    </WrapPanel>
+                    <Label Content="{Binding Biz.DetectState}" />
                 </WrapPanel>
             </Grid>
         </Grid>
         <Grid Grid.Row="1">
+            <Border Name="RectBorder" BorderBrush="Red" BorderThickness="2"  Height="64"  Width="64" Margin="{Binding Biz.Margin}" HorizontalAlignment="Left" VerticalAlignment="Top" Panel.ZIndex="10"/>
             <StackPanel Orientation="Horizontal">
-                <WindowsFormsHost Width="200">
-                    <forms:PropertyGrid x:Name="PropertyGrid" Width="200" SelectedObject="Biz"/>
+                <WindowsFormsHost x:Name="pgFormhost" Width="200">
+                    <forms:PropertyGrid x:Name="PropertyGrid" Width="200"/>
                 </WindowsFormsHost>
-                <WindowsFormsHost x:Name="formhost" Width="640" Height="480" VerticalAlignment="Top" HorizontalAlignment="Left">
-                    <forms:PictureBox x:Name="PreviewBox" Height="480" Width="640"></forms:PictureBox>
+                <WindowsFormsHost x:Name="pbFormhost" Width="640" Height="480" VerticalAlignment="Top" HorizontalAlignment="Left">
+                    <forms:PictureBox x:Name="PreviewBox" Width="640" Height="480"></forms:PictureBox>
                 </WindowsFormsHost>
-                <ListView Name="HistoryHurts" ItemsSource="{Binding Biz.Alarms}" Grid.Column="1" Width="Auto" HorizontalAlignment="Right" VerticalAlignment="Top">
+                <Image Name="imageC" Width="640" Height="480" HorizontalAlignment="Left" VerticalAlignment="Top" Source="{Binding Biz.PreviewImage}" MouseMove="Image_MouseMove" />
+
+                <ListView Name="HistoryHurts" ItemsSource="{Binding Biz.Alarms}" Grid.Column="1" Width="Auto" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" SelectedIndex="{Binding Biz.SelectedAlarmIndex}">
                     <ListView.View>
                         <GridView>
                             <GridViewColumn Header="水平坐标" DisplayMemberBinding="{Binding XPos}" />
@@ -59,9 +65,7 @@
                         </Style>
                     </ListView.ItemContainerStyle>-->
                 </ListView>
-                <!--<Image Name="imageC" Width="640" Height="480" HorizontalAlignment="Left" VerticalAlignment="Top" Source="{Binding Biz.PreviewImage}" MouseMove="Image_MouseMove" />-->
-
-                <!--<Border BorderBrush="Red" BorderThickness="2"  Height="64"  Width="64" Margin="{Binding Biz.Margin}" HorizontalAlignment="Left" VerticalAlignment="Top"/>-->
+    
                 <!--<ui:MainUIControl x:Name="MainUI"/>-->
             </StackPanel>
          </Grid>

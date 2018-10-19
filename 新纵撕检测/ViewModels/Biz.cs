@@ -14,6 +14,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Windows.Media.Imaging;
 using 新纵撕检测.Models;
+using 纵撕检测.Models;
 
 namespace 新纵撕检测.ViewModels
 {
@@ -28,7 +29,31 @@ namespace 新纵撕检测.ViewModels
 
         public bool DetectFlag { get; private set; } = true;
         public bool IsAlarm { get; set; }
+        private Image<Bgr, Byte> Image = new Image<Bgr, Byte>(ImageSize);
         public ConcurrentQueue<Image<Bgr, Byte>> ImageQueue { get; set; } = new ConcurrentQueue<Image<Bgr, byte>>();
+        private class MyInt
+        {
+            public int XPos { get; set; }
+            public int YPos { get; set; }
+            int pixRange;
+            public MyInt(int xPos, int yPos, int range)
+            {
+                XPos = xPos;
+                YPos = yPos;
+                pixRange = range;
+            }
+            public override bool Equals(object obj)
+            {
+                var tmp = obj as MyInt;
+                if (Math.Abs(tmp.XPos - XPos) <= pixRange)
+                {
+                    return true;
+                }
+                return false;
+            }
+        }
+        ConcurrentDictionary<MyInt, DetectResultStatistic> detectResultStatistics = new ConcurrentDictionary<MyInt, DetectResultStatistic>();
+
         private ObservableCollection<AlarmRecord> alarms;
         public ObservableCollection<AlarmRecord> Alarms
         {
@@ -71,12 +96,18 @@ namespace 新纵撕检测.ViewModels
             }
         }
         private int CapCount;
+        private int LoopCount = 0;
+        private int LoopOffset = 0;
+        private bool AlarmHeadFlag = true;
+        private AlarmRecord firstAlarmRecord = null;
+        private SerialComm serialComm;
 
         private PictureBox pictureBox;
-        private PropertyGrid propertyGrid;
+        public PropertyGrid propertyGrid;
 
-        public DetectParam detectParam { get; set; }
-        public AlarmParam alarmParam { get; set; } = new AlarmParam { PixelRange=30 };
+        public DetectParam DetectParam { get; set; }
+        public SerialParam SerialParam { get; set; }
+        public AlarmParam AlarmParam { get; set; }
         private DetectResultState detectState;
         public DetectResultState DetectState
         {
@@ -87,21 +118,47 @@ namespace 新纵撕检测.ViewModels
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("DetectState"));
             }
         }
+        private int selectedAlarmIndex;
+        public int SelectedAlarmIndex
+        {
+            get { return selectedAlarmIndex; }
+            set
+            {
+                selectedAlarmIndex = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("SelectedAlarmIndex"));
+            }
+        }
 
         public Biz(MainWindow mainWindow)
         {
             pictureBox = mainWindow.PreviewBox;
             propertyGrid = mainWindow.PropertyGrid;
+            propertyGrid.SelectedObject = DetectParam;
             if (InitCamera())
             {
-                
+                mainWindow.imageC.Visibility = System.Windows.Visibility.Collapsed;
+                mainWindow.RectBorder.Visibility= System.Windows.Visibility.Collapsed;
             }
             else
             {
                 InitLocalCamera();
+                mainWindow.pbFormhost.Visibility = System.Windows.Visibility.Collapsed;
             }
             Algorithm.svm_start();
+            AlarmRecord.SetRange(20,4);
+            AlarmRecord.TotalLoopCount = 45;
+            SerialParam = new SerialParam {
+                PortName = "COM1",
+                BaudRate = 9600,
+                Parity = System.IO.Ports.Parity.None,
+                StopBits = System.IO.Ports.StopBits.One,
+                DataBits = 8
+            };
+            AlarmParam = new AlarmParam { PixelRange = 30 };
+            DetectParam = new DetectParam { Left = 50, Right = 500, Up = 200, Down = 300, StartY = 260, AlarmWidth = 1.5f, AlarmDepth = 1.5f };
+            serialComm = new SerialComm(SerialParam);
             Alarms = new ObservableCollection<AlarmRecord>();
+
             StartDetect();
         }
         ~Biz()
@@ -131,15 +188,18 @@ namespace 新纵撕检测.ViewModels
             {
                 Task.Run(() =>
                 {
-                    while (true)
+                    while(true)
                     {
                         Console.WriteLine("计算: "+ FrameCount + " 采集: "+ CapCount + " 图片队列: " + ImageQueue.Count);
                         FrameCount = 0;
                         CapCount = 0;
+                        LoopCount += 1;
+                        LoopCount %= AlarmRecord.TotalLoopCount;
                         Thread.Sleep(1000);
                     }
                 });
                 AlgorithmResult[] algorithmResults;
+                AlarmRecord beginRecord = null;
                 while (DetectFlag)
                 {
                     Task.Run(() =>
@@ -147,24 +207,25 @@ namespace 新纵撕检测.ViewModels
                         Image<Bgr, byte> image;
                         if (ImageQueue.TryDequeue(out image))
                         {
-                            algorithmResults = Algorithm.DetectImage(image.Ptr, new DetectParam { Left = 50, Right = 500, Up = 200, Down = 300, StartY = 260, AlarmWidth = 1.5f, AlarmDepth = 1.5f });
-
+                            algorithmResults = Algorithm.DetectImage(image.Ptr, DetectParam);
                             List<AlgorithmResult> results = new List<AlgorithmResult>(algorithmResults);
                             results.ForEach(result =>
                             {
                                 if (result.bStop != 0 || result.bWidthReachStop != 0)
                                 {
                                     DrawRectOnScreen(result.xPos, result.yPos);
-                                    AddResultToStatistics(result.xPos);
+                                    AddResultToStatistics(result.xPos,result.yPos);
                                 }
                             });
 
                             if (detectResultStatistics.Count > 0)
                             {
                                 int avgX = 0;
-                                TimeSpan maxDuration = FindMaxDuration(out avgX);
+                                int avgY = 0;
+                                DateTime beginTime = DateTime.MinValue;
+                                TimeSpan maxDuration = FindMaxDuration(out avgX,out avgY,out beginTime);
+                                float length = (float)((maxDuration.Seconds + maxDuration.Milliseconds / 1000.0) * 0.085);
                                 DateTime latestTime = FindLatestTime();
-
                                 TimeSpan maxErrorTime = TimeSpan.FromSeconds(1);
                                 TimeSpan maxHurtTime = TimeSpan.FromSeconds(1.0);
                                 TimeSpan maxDivTime = TimeSpan.FromSeconds(0.5);
@@ -172,19 +233,22 @@ namespace 新纵撕检测.ViewModels
                                 {
                                     DetectState = DetectResultState.皮带正常;
                                     detectResultStatistics.Clear();
+                                    AlarmHeadFlag = true;
+                                    AlarmRecord.LoopOffset = LoopOffset;
+                                    beginRecord = null;
                                     //DrawRectOnScreen(-100, -100);
                                 }
                                 else if (maxDuration > maxHurtTime)//逻辑判断有超过maxHurtTime时间,此时发生撕伤警报
                                 {
                                     DetectState = DetectResultState.撕伤;
-                                    //AddAlarmToStatistics(avgX);
+                                    AddAlarmToStatistics(avgX, avgY, length);
                                 }
                                 else if (maxDuration > maxDivTime)//逻辑判断有超过maxDivTime时间,此时发生撕裂警报
                                 {
                                     DetectState = DetectResultState.撕裂;
                                 }
-                                FrameCount++;
                             }
+                            FrameCount++;
                         }
                     });
 
@@ -193,13 +257,43 @@ namespace 新纵撕检测.ViewModels
             });
         }
 
-        private void AddAlarmToStatistics(int avgX)
+        private void AddAlarmToStatistics(int avgX, int yPic, float length)
         {
+            int xPos = avgX;
+            //int yPos = GetLoop();
+            int yPos = LoopCount;
+            AlarmRecord alarmRecord = new AlarmRecord { XPos = xPos, YPos = yPos,YPic=yPic, LatestOccurTime = DateTime.Now, Length = length };
+
             App.Current.Dispatcher.Invoke(() =>
             {
-                Alarms.Add(new AlarmRecord { CreatedTime = DateTime.Now, XPos = avgX });
+                if (Alarms.Contains(alarmRecord))
+                {
+                    int index = Alarms.IndexOf(alarmRecord);
+                    var alarm = Alarms[index];
+                    alarm.XPos = alarmRecord.XPos;
+                    if (AlarmHeadFlag)
+                    {
+                        if (firstAlarmRecord==null)
+                        {
+                            firstAlarmRecord = alarmRecord;
+                        }
+                        if (firstAlarmRecord==alarmRecord)
+                        {
+                            LoopOffset = alarmRecord.YPos - alarm.YPos;
+                        }
+                        alarm.YPos = alarmRecord.YPos;
+                        AlarmHeadFlag = false;
+                    }
+                    alarm.Length = alarmRecord.Length;
+                    alarm.LatestOccurTime = alarmRecord.LatestOccurTime;
+                }
+                else
+                {
+                    Alarms.Add(alarmRecord);
+                    Alarm(alarmRecord);
+                }
+                SelectedAlarmIndex = Alarms.IndexOf(alarmRecord);
             });
-            
         }
 
         private DateTime FindLatestTime()
@@ -216,49 +310,34 @@ namespace 新纵撕检测.ViewModels
             return latestTime;
         }
 
-        private TimeSpan FindMaxDuration(out int avgX)
+        private TimeSpan FindMaxDuration(out int avgX, out int avgY, out DateTime beginTime)
         {
             //撕裂点最长的时间
             TimeSpan maxDuration = TimeSpan.Zero;
+            beginTime = DateTime.MinValue;
             int xSum = 0;
+            int ySum = 0;
             //遍历查找计时最长的撕裂点记录
             DetectResultStatistic detectResultStatistic = null;
             foreach (var item in detectResultStatistics)
             {
-                xSum += item.Value.xPos;
+                xSum += item.Key.XPos;
+                ySum += item.Key.YPos;
                 if (DateTime.Now - item.Value.beginTimeStamp > maxDuration)
                 {
                     maxDuration = DateTime.Now - item.Value.beginTimeStamp;
+                    beginTime = item.Value.beginTimeStamp;
                     detectResultStatistic = item.Value;
                 }
             }
             avgX = xSum / detectResultStatistics.Count;
+            avgY = ySum / detectResultStatistics.Count;
             return maxDuration;
         }
 
-        private class MyInt
+        public void AddResultToStatistics(int xPos, int yPos)
         {
-            int xPos;
-            int pixRange;
-            public MyInt(int pos,int range)
-            {
-                xPos = pos;
-                pixRange = range;
-            }
-            public override bool Equals(object obj)
-            {
-                var tmp = obj as MyInt;
-                if (Math.Abs(tmp.xPos-xPos)<=pixRange)
-                {
-                    return true;
-                }
-                return false;
-            }
-        }
-        ConcurrentDictionary<MyInt, DetectResultStatistic> detectResultStatistics = new ConcurrentDictionary<MyInt, DetectResultStatistic>();
-        public void AddResultToStatistics(int xPos)
-        {
-            MyInt myInt = new MyInt(xPos, alarmParam.PixelRange);
+            MyInt myInt = new MyInt(xPos,yPos, AlarmParam.PixelRange);
             TimeSpan maxErrorTime = TimeSpan.FromSeconds(0.5);
             detectResultStatistics.AddOrUpdate(myInt,
                 new DetectResultStatistic
@@ -290,32 +369,60 @@ namespace 新纵撕检测.ViewModels
             return false;
         }
 
-        public void Alarm()
+        public void Alarm(AlarmRecord alarmRecord)
         {
             SendGPIOSignal();
-            SendAlarmInfo();
-            SaveCurrentImage();
+            SendAlarmInfo(alarmRecord);
+            SaveCurrentImage(alarmRecord);
         }
 
-        private void SendAlarmInfo()
+        private void SendAlarmInfo(AlarmRecord alarmRecord)
         {
-            
+            serialComm.Alarm = true;
+            serialComm.AlarmRecord = alarmRecord;
         }
 
         private void SendGPIOSignal()
         {
-            throw new NotImplementedException();
+            Task.Run(() =>
+            {
+                GPIO.SetHigh();
+                Thread.Sleep(5000);
+                GPIO.SetLow();
+                serialComm.Alarm = false;
+            });
         }
 
-        private void SaveCurrentImage()
+        private void SaveCurrentImage(AlarmRecord alarmRecord)
         {
-            DrawRectOnImage();
+            string picName = alarmRecord.XPos + "_" + alarmRecord.YPic + "_";
+            string destFolder = "C:\\Alarm_Pic\\pic_" + alarmRecord.CreatedTime.ToString("yyyy_MM_dd") + "\\下位机_" + DetectParam.CameraNo + "_报警截图\\";
+            if (!Directory.Exists(destFolder))
+            {
+                Directory.CreateDirectory(destFolder);
+            }
+            string destFileName = picName + alarmRecord.CreatedTime.ToString("hh_mm_ss.fff") + "_AlarmPic.bmp";
+            string destFile = destFolder + destFileName;
 
+            var image = Image.Clone();
+            image.Draw(new Rectangle(alarmRecord.XPos - 32, alarmRecord.YPic - 32, 64, 64), new Bgr(Color.Red), 3);
+            image.Bitmap.Save(destFolder + destFileName);
         }
 
-        private void DrawRectOnImage()
+        private void SaveCurrentImageVideo(AlarmRecord alarmRecord, DateTime beginTime,AlarmRecord beginRecord)
         {
+            string picName = alarmRecord.XPos + "_" + alarmRecord.YPic + "_";
+            string destFolder = "C:\\Alarm_Video\\pic_" + beginRecord.CreatedTime.ToString("yyyy_MM_dd") + "\\下位机_" + DetectParam.CameraNo + "_报警截图\\"+ picName + beginRecord.CreatedTime.ToString("hh_mm_ss.fff") + "_AlarmPic\\";
+            if (!Directory.Exists(destFolder))
+            {
+                Directory.CreateDirectory(destFolder);
+            }
+            string destFileName = alarmRecord.CreatedTime.ToString("hh_mm_ss.fff")+".bmp";
+            string destFile = destFolder + destFileName;
 
+            var image = Image.Clone();
+            image.Draw(new Rectangle(alarmRecord.XPos - 32, alarmRecord.YPic - 32, 64, 64), new Bgr(Color.Red), 3);
+            image.Bitmap.Save(destFile);
         }
 
         private bool InitCamera()
@@ -327,9 +434,11 @@ namespace 新纵撕检测.ViewModels
             {
                 m_Grabber = new IntPtr();
                 int hCamera = 0;
+                
                 if (MvApi.CameraGrabber_Create(out m_Grabber, ref m_DevInfo[0]) == CameraSdkStatus.CAMERA_STATUS_SUCCESS)
                 {
                     MvApi.CameraGrabber_GetCameraHandle(m_Grabber, out hCamera);
+                    GPIO.Init(hCamera);
                     MvApi.CameraGrabber_SetRGBCallback(m_Grabber, m_FrameCallback, IntPtr.Zero);
 
                     // 黑白相机设置ISP输出灰度图像
@@ -355,7 +464,6 @@ namespace 新纵撕检测.ViewModels
             return false;
         }
 
-        Image<Bgr, Byte> Image = new Image<Bgr, Byte>(ImageSize);
         private void CameraGrabberFrameCallback(IntPtr Grabber, IntPtr pFrameBuffer, ref tSdkFrameHead pFrameHead, IntPtr Context)
         {
             if (DetectFlag)
@@ -363,14 +471,6 @@ namespace 新纵撕检测.ViewModels
                 using (Image image = MvApi.CSharpImageFromFrame(pFrameBuffer, ref pFrameHead))
                 {
                     Image.Bitmap = (Bitmap)image;
-                    using (MemoryStream stream = new MemoryStream())
-                    {
-                        Image.Bitmap.Save(stream, ImageFormat.Bmp);
-                        //App.Current.Dispatcher.Invoke(() =>
-                        //{
-                        //    //SetPreviewImage(stream);
-                        //});
-                    }
                     ImageQueue.Enqueue(Image);
                     CapCount++;
                 }
@@ -408,7 +508,7 @@ namespace 新纵撕检测.ViewModels
 
         public void DrawRectOnScreen(double posX, double posY)
         {
-            Margin = new System.Windows.Thickness(posX-32, posY-32, 0, 0);
+            Margin = new System.Windows.Thickness(posX-32+200, posY-32, 0, 0);
             Rectangle rect = new Rectangle((int)posX - 32, (int)posY - 32, 64, 64);
             Pen pen= new Pen(Color.WhiteSmoke, 3);
             switch (DetectState)

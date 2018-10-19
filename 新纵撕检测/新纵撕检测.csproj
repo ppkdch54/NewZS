@@ -94,8 +94,9 @@
     <Compile Include="Models\AlarmInfo.cs" />
     <Compile Include="Models\Algorithm.cs" />
     <Compile Include="Models\AlgorithmResult.cs" />
-    <Compile Include="Models\Class1.cs" />
-    <Compile Include="Models\DetectParam.cs" />
+    <Compile Include="Models\Comm.cs" />
+    <Compile Include="Models\GPIO.cs" />
+    <Compile Include="Models\Params.cs" />
     <Compile Include="ViewModels\Biz.cs" />
     <Compile Include="ViewModels\MainWindowViewModel.cs" />
     <Page Include="MainWindow.xaml">
