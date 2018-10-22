@@ -52,7 +52,7 @@ namespace 新纵撕检测.Models
         static int yRange=0;
 
         public static int LoopOffset { get; set; } = 0;
-        public static int TotalLoopCount { get; set; } = 0;
+        public static int TotalLoopCount { get; set; } = int.MaxValue;
 
         public AlarmRecord()
         {
@@ -63,9 +63,15 @@ namespace 新纵撕检测.Models
         public override bool Equals(object obj)
         {
             var tmp = obj as AlarmRecord;
+            if (tmp==null)
+            {
+                return false;
+            }
             if (Math.Abs(tmp.XPos - XPos) <= xRange &&
+                (
                 (Math.Abs(tmp.YPos - YPos - LoopOffset) % TotalLoopCount <= yRange) ||
                 Math.Abs(tmp.YPos - YPos - LoopOffset) % TotalLoopCount >= TotalLoopCount - yRange)
+                )
             {
                 return true;
             }

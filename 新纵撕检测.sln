@@ -10,6 +10,7 @@ Global
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
 		ReleaseRemote|Any CPU = ReleaseRemote|Any CPU
+		ReleaseSingleRemote|Any CPU = ReleaseSingleRemote|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{30559711-A889-44A4-9925-50380180198B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
@@ -18,6 +19,8 @@ Global
 		{30559711-A889-44A4-9925-50380180198B}.Release|Any CPU.Build.0 = Release|Any CPU
 		{30559711-A889-44A4-9925-50380180198B}.ReleaseRemote|Any CPU.ActiveCfg = ReleaseRemote|Any CPU
 		{30559711-A889-44A4-9925-50380180198B}.ReleaseRemote|Any CPU.Build.0 = ReleaseRemote|Any CPU
+		{30559711-A889-44A4-9925-50380180198B}.ReleaseSingleRemote|Any CPU.ActiveCfg = ReleaseSingleRemote|Any CPU
+		{30559711-A889-44A4-9925-50380180198B}.ReleaseSingleRemote|Any CPU.Build.0 = ReleaseSingleRemote|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

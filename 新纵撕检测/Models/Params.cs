@@ -2,6 +2,7 @@
 using System.ComponentModel;
 using System.IO.Ports;
 using System.Runtime.InteropServices;
+using System.Xml.Serialization;
 
 namespace 新纵撕检测.Models
 {
@@ -22,20 +23,84 @@ namespace 新纵撕检测.Models
     }
     public class AlarmParam
     {
-        [Category("报警参数"),DisplayName("停带长度")]
-        public float StopLength { get; set; } = 5;
+        private float maxHurtDistance;
+        private float maxDivDistance;
+        private float maxErrorDistance;
+        private float velocity = 5;
+
+        private int totalLoopCount;
+        [Category("报警参数"), DisplayName("皮带总圈数"),Description("总圈数如果为非法值,会重置成系统最大值.")]
+        public int TotalLoopCount
+        {
+            get { return totalLoopCount; }
+            set
+            {
+                totalLoopCount = value;
+                if (totalLoopCount<=0)
+                {
+                    totalLoopCount = int.MaxValue;
+                }
+            }
+        }
+
+        [Category("报警参数"), DisplayName("皮带速度(m/s)"), Description("总圈数如果为非法值,会重置成5.")]
+        public float Velocity
+        {
+            get { return velocity; }
+            set
+            {
+                velocity = value;
+                if (velocity<=0)
+                {
+                    velocity = 5;
+                }
+                MaxHurtTime = DateTime.MinValue.AddSeconds(maxHurtDistance / Velocity) - DateTime.MinValue;
+                MaxDivTime = DateTime.MinValue.AddSeconds(maxDivDistance / Velocity) - DateTime.MinValue;
+                MaxErrorTime = DateTime.MinValue.AddSeconds(maxErrorDistance / Velocity) - DateTime.MinValue;
+            }
+        }
+        [Category("报警参数"), DisplayName("停带长度")]
+        public float MaxHurtDistance
+        {
+            get { return maxHurtDistance; }
+            set
+            {
+                maxHurtDistance = value;
+                MaxHurtTime = DateTime.MinValue.AddSeconds(maxHurtDistance / Velocity) - DateTime.MinValue;
+            }
+        }
         [Category("报警参数"), DisplayName("撕裂长度")]
-        public float StrenchLength { get; set; } = 2;
+        public float MaxDivDistance
+        {
+            get { return maxDivDistance; }
+            set
+            {
+                maxDivDistance = value;
+                MaxDivTime = DateTime.MinValue.AddSeconds(maxDivDistance / Velocity) - DateTime.MinValue;
+            }
+        }
         [Category("报警参数"), DisplayName("连续损伤间隔最大长度")]
-        public float MaxErrorDistance { get; set; } = 1;
+        public float MaxErrorDistance
+        {
+            get { return maxErrorDistance; }
+            set
+            {
+                maxErrorDistance = value;
+                MaxErrorTime = DateTime.MinValue.AddSeconds(maxErrorDistance / Velocity) - DateTime.MinValue;
+            }
+        }
         [Category("报警参数"), DisplayName("损伤位置范围")]
-        public int PixelRange { get; set; } = 30;
-        [Category("报警参数"), DisplayName("皮带速度(m/s)")]
-        public float Velocity { get; set; } = 5;
+        public int PixelRange { get; set; }
         [Category("报警参数"), DisplayName("皮带同伤圈数偏差")]
-        public int YRange { get; set; } = 20;
+        public int YRange { get; set; }
         [Category("报警参数"), DisplayName("报警图片保留天数")]
-        public int ReservedDays { get; set; } = 7;
+        public int ReservedDays { get; set; }
+        //[Browsable(false)]
+        public TimeSpan MaxErrorTime { get; private set; }
+        //[Browsable(false)]
+        public TimeSpan MaxHurtTime { get; private set; }
+        //[Browsable(false)]
+        public TimeSpan MaxDivTime { get; private set; }
     }
     public class SerialParam
     {
@@ -54,7 +119,18 @@ namespace 新纵撕检测.Models
     /// 检测参数
     /// </summary>
     [StructLayout(LayoutKind.Sequential)]
-    public struct DetectParam
+    public struct StDetectParam
+    {
+        public int CameraNo;           //相机编号
+        public int Left;               //检测左边界
+        public int Right;              //检测右边界
+        public int Up;                 //检测上边界
+        public int Down;               //检测下边界
+        public int StartY;             //开始指定y坐标
+        public float AlarmWidth;       //检测宽度
+        public float AlarmDepth;       //检测深度 
+    }
+    public class DetectParam
     {
         [Category("检测参数"), DisplayName("相机编号")]
         public int CameraNo { get; set; }           //相机编号
@@ -72,5 +148,21 @@ namespace 新纵撕检测.Models
         public float AlarmWidth { get; set; }       //检测宽度
         [Category("检测参数"), DisplayName("检测深度")]
         public float AlarmDepth { get; set; }       //检测深度 
+
+        internal StDetectParam GetSt()
+        {
+            StDetectParam stDetectParam = new StDetectParam
+            {
+                CameraNo = CameraNo,
+                Left = Left,
+                Right = Right,
+                Up = Up,
+                Down = Down,
+                StartY = StartY,
+                AlarmWidth = AlarmWidth,
+                AlarmDepth = AlarmDepth
+            };
+            return stDetectParam;
+        }
     }
 }

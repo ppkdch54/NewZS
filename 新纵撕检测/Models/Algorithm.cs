@@ -8,13 +8,13 @@ namespace 新纵撕检测.Models
         [DllImport("runEx.dll")]
         public static extern void svm_start();
         [DllImport("runEx.dll", EntryPoint = "runEx", CallingConvention = CallingConvention.Cdecl)]
-        public static extern void DetectAlgorithm(IntPtr imageHandle, DetectParam detectParam, int cameraNo, IntPtr alarmInfo);
+        public static extern void DetectAlgorithm(IntPtr imageHandle, StDetectParam detectParam, int cameraNo, IntPtr alarmInfo);
 
         const int AlarmInfoCount = 10;        //算法返回报警信息的数目
         static int size = Marshal.SizeOf(typeof(AlgorithmResult)) * AlarmInfoCount;
         static IntPtr pResultBuff = Marshal.AllocHGlobal(size); //指向算法结果的内存指针
 
-        public static AlgorithmResult[] DetectImage(IntPtr imageHandle, DetectParam detectParam)
+        public static AlgorithmResult[] DetectImage(IntPtr imageHandle, StDetectParam detectParam)
         {
             //清零存放算法结果的内存区域
             byte[] zeroBytes = new byte[size];

@@ -7,7 +7,7 @@
         xmlns:ui="clr-namespace:UIControl;assembly=UIControl"
         xmlns:local="clr-namespace:新纵撕检测"
         mc:Ignorable="d"
-        Title="纵撕检测系统下位机" HorizontalContentAlignment="Stretch">
+        Title="纵撕检测系统下位机" HorizontalContentAlignment="Stretch" WindowState="Maximized">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="27"/>
@@ -21,30 +21,36 @@
                     <ColumnDefinition Width="80"/>
                 </Grid.ColumnDefinitions>
                 <WrapPanel VerticalAlignment="Stretch">
-                    
+
                     <Label Content="权限代码: "/>
-                    <TextBox Name="CMD" Width="50" TextChanged="TextBox_TextChanged"/>
-                    <WrapPanel Name="btnGroup" VerticalAlignment="Center">
+                    <PasswordBox Name="CMD" Width="50" KeyUp="CMD_KeyUp"/>
+                    <WrapPanel Name="btnGroup" VerticalAlignment="Center" Visibility="Collapsed">
                         <Button Name="btnSerial" Content="串口参数" Click="SwitchSerialParam"/>
                         <Button Name="btnDetect" Content="检测参数" Click="SwitchDetectParam"/>
                         <Button Name="btnAlarm" Content="警报参数" Click="SwitchAlarmParam"/>
+                        <Button Name="btnHide" Content="隐藏参数窗口" Click="HideParamWindow"/>
                     </WrapPanel>
                     <Label Content="{Binding Biz.DetectState}" />
+                    <Label Name="lbMousePos"/>
                 </WrapPanel>
             </Grid>
         </Grid>
         <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="96*"/>
+                <ColumnDefinition Width="665*"/>
+            </Grid.ColumnDefinitions>
             <Border Name="RectBorder" BorderBrush="Red" BorderThickness="2"  Height="64"  Width="64" Margin="{Binding Biz.Margin}" HorizontalAlignment="Left" VerticalAlignment="Top" Panel.ZIndex="10"/>
-            <StackPanel Orientation="Horizontal">
-                <WindowsFormsHost x:Name="pgFormhost" Width="200">
-                    <forms:PropertyGrid x:Name="PropertyGrid" Width="200"/>
+            <StackPanel Orientation="Horizontal" Grid.ColumnSpan="2" Margin="0,0,-0.4,0.4">
+                <WindowsFormsHost x:Name="pgFormhost" Width="200" Visibility="Collapsed">
+                    <forms:PropertyGrid x:Name="PropertyGrid" Width="200" PropertyValueChanged="PropertyGrid_PropertyValueChanged" PropertySort="NoSort"/>
                 </WindowsFormsHost>
-                <WindowsFormsHost x:Name="pbFormhost" Width="640" Height="480" VerticalAlignment="Top" HorizontalAlignment="Left">
-                    <forms:PictureBox x:Name="PreviewBox" Width="640" Height="480"></forms:PictureBox>
+                <WindowsFormsHost x:Name="pbFormhost" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" MinWidth="640">
+                    <forms:PictureBox x:Name="PreviewBox" Width="960" Height="720" MouseMove="PreviewBox_MouseMove" MouseDown="PreviewBox_MouseDown" MouseUp="PreviewBox_MouseUp"></forms:PictureBox>
                 </WindowsFormsHost>
                 <Image Name="imageC" Width="640" Height="480" HorizontalAlignment="Left" VerticalAlignment="Top" Source="{Binding Biz.PreviewImage}" MouseMove="Image_MouseMove" />
 
-                <ListView Name="HistoryHurts" ItemsSource="{Binding Biz.Alarms}" Grid.Column="1" Width="Auto" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" SelectedIndex="{Binding Biz.SelectedAlarmIndex}">
+                <ListView Name="HistoryHurts" ItemsSource="{Binding Biz.Alarms}" Grid.Column="1" Width="Auto" HorizontalAlignment="Right" VerticalAlignment="Stretch" SelectedIndex="{Binding Biz.SelectedAlarmIndex}" HorizontalContentAlignment="Stretch">
                     <ListView.View>
                         <GridView>
                             <GridViewColumn Header="水平坐标" DisplayMemberBinding="{Binding XPos}" />
@@ -54,21 +60,11 @@
                             <GridViewColumn Header="最新记录" DisplayMemberBinding="{Binding LatestOccurTime}" />
                         </GridView>
                     </ListView.View>
-                    <!--<ListView.ItemContainerStyle>
-                        <Style TargetType="ListViewItem">
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding Path=CurrentAlarm}" Value="True">
-                                    <Setter Property="Background" Value="Red" />
-                                    <Setter Property="Foreground" Value="Yellow"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </ListView.ItemContainerStyle>-->
                 </ListView>
-    
+
                 <!--<ui:MainUIControl x:Name="MainUI"/>-->
             </StackPanel>
-         </Grid>
+        </Grid>
 
     </Grid>
 </Window>

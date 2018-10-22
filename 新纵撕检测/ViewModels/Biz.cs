@@ -1,6 +1,7 @@
 ﻿using Emgu.CV;
 using Emgu.CV.Structure;
 using MVSDK;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -11,6 +12,7 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Timers;
 using System.Windows.Forms;
 using System.Windows.Media.Imaging;
 using 新纵撕检测.Models;
@@ -31,12 +33,12 @@ namespace 新纵撕检测.ViewModels
         public bool IsAlarm { get; set; }
         private Image<Bgr, Byte> Image = new Image<Bgr, Byte>(ImageSize);
         public ConcurrentQueue<Image<Bgr, Byte>> ImageQueue { get; set; } = new ConcurrentQueue<Image<Bgr, byte>>();
-        private class MyInt
+        private class AlarmPos
         {
             public int XPos { get; set; }
             public int YPos { get; set; }
             int pixRange;
-            public MyInt(int xPos, int yPos, int range)
+            public AlarmPos(int xPos, int yPos, int range)
             {
                 XPos = xPos;
                 YPos = yPos;
@@ -44,7 +46,7 @@ namespace 新纵撕检测.ViewModels
             }
             public override bool Equals(object obj)
             {
-                var tmp = obj as MyInt;
+                var tmp = obj as AlarmPos;
                 if (Math.Abs(tmp.XPos - XPos) <= pixRange)
                 {
                     return true;
@@ -52,7 +54,7 @@ namespace 新纵撕检测.ViewModels
                 return false;
             }
         }
-        ConcurrentDictionary<MyInt, DetectResultStatistic> detectResultStatistics = new ConcurrentDictionary<MyInt, DetectResultStatistic>();
+        ConcurrentDictionary<AlarmPos, DetectResultStatistic> detectResultStatistics = new ConcurrentDictionary<AlarmPos, DetectResultStatistic>();
 
         private ObservableCollection<AlarmRecord> alarms;
         public ObservableCollection<AlarmRecord> Alarms
@@ -96,7 +98,6 @@ namespace 新纵撕检测.ViewModels
             }
         }
         private int CapCount;
-        private int LoopCount = 0;
         private int LoopOffset = 0;
         private bool AlarmHeadFlag = true;
         private AlarmRecord firstAlarmRecord = null;
@@ -106,6 +107,7 @@ namespace 新纵撕检测.ViewModels
         public PropertyGrid propertyGrid;
 
         public DetectParam DetectParam { get; set; }
+        private StDetectParam stDetectParam = new StDetectParam();
         public SerialParam SerialParam { get; set; }
         public AlarmParam AlarmParam { get; set; }
         private DetectResultState detectState;
@@ -133,7 +135,7 @@ namespace 新纵撕检测.ViewModels
         {
             pictureBox = mainWindow.PreviewBox;
             propertyGrid = mainWindow.PropertyGrid;
-            propertyGrid.SelectedObject = DetectParam;
+
             if (InitCamera())
             {
                 mainWindow.imageC.Visibility = System.Windows.Visibility.Collapsed;
@@ -144,23 +146,179 @@ namespace 新纵撕检测.ViewModels
                 InitLocalCamera();
                 mainWindow.pbFormhost.Visibility = System.Windows.Visibility.Collapsed;
             }
-            Algorithm.svm_start();
-            AlarmRecord.SetRange(20,4);
-            AlarmRecord.TotalLoopCount = 45;
-            SerialParam = new SerialParam {
-                PortName = "COM1",
-                BaudRate = 9600,
-                Parity = System.IO.Ports.Parity.None,
-                StopBits = System.IO.Ports.StopBits.One,
-                DataBits = 8
-            };
-            AlarmParam = new AlarmParam { PixelRange = 30 };
-            DetectParam = new DetectParam { Left = 50, Right = 500, Up = 200, Down = 300, StartY = 260, AlarmWidth = 1.5f, AlarmDepth = 1.5f };
-            serialComm = new SerialComm(SerialParam);
-            Alarms = new ObservableCollection<AlarmRecord>();
-
+            
+            LoadParams();
+            AlarmRecord.TotalLoopCount = AlarmParam.TotalLoopCount;
+            serialComm = new SerialComm(SerialParam,DetectParam.CameraNo);
+            propertyGrid.SelectedObject = DetectParam;
             StartDetect();
+            Task.Run(() =>
+            {
+                Algorithm.svm_start();
+                AutoDeletePics();
+            });
+
         }
+
+        private void AutoDeletePics()
+        {
+            System.Timers.Timer pTimer = new System.Timers.Timer(24 * 3600 * 1000);
+            pTimer.Elapsed += PTimer_Elapsed;
+            pTimer.Start();
+            PTimer_Elapsed(null, null);
+        }
+
+        private void PTimer_Elapsed(object sender, ElapsedEventArgs e)
+        {
+            List<string> excludePath = new List<string>();
+            for (int i = 0; i < AlarmParam.ReservedDays; i++)
+            {
+                excludePath.Add("C:\\Alarm_Pic\\pic_" + DateTime.Today.AddDays(-i).ToString("yyyy_MM_dd"));
+            }
+            string srcPath = "C:\\Alarm_Pic\\";
+            if (!Directory.Exists(srcPath))
+            {
+                return;
+            }
+            try
+            {
+                DirectoryInfo dir = new DirectoryInfo(srcPath);
+                FileSystemInfo[] fileinfo = dir.GetFileSystemInfos();  //返回目录中所有文件和子目录
+                foreach (FileSystemInfo i in fileinfo)
+                {
+                    if (i is DirectoryInfo)            //判断是否文件夹
+                    {
+                        bool deleteFlag = true;
+                        foreach (var path in excludePath)
+                        {
+                            if (i.FullName.Contains(path))
+                            {
+                                deleteFlag = false;
+                                break;
+                            }
+                        }
+                        if (deleteFlag)
+                        {
+                            DirectoryInfo subdir = new DirectoryInfo(i.FullName);
+                            subdir.Delete(true);          //删除子目录和文件
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
+        }
+
+        private void LoadParams()
+        {
+            {
+                string fp = Application.StartupPath + "\\AlarmParam.json";
+                if (!File.Exists(fp))  // 判断是否已有相同文件 
+                {
+                    FileStream fs = new FileStream(fp, FileMode.Create, FileAccess.ReadWrite);
+                    fs.Close();
+                }
+                AlarmParam = JsonConvert.DeserializeObject<AlarmParam>(File.ReadAllText(fp));
+                if (AlarmParam == null)
+                {
+                    //读取bak文件
+                    string fp1 = Application.StartupPath + "\\AlarmParam_bak.json";
+                    if (!File.Exists(fp1))  // 判断是否已有相同文件 
+                    {
+                        FileStream fs = new FileStream(fp1, FileMode.Create, FileAccess.ReadWrite);
+                        fs.Close();
+                    }
+                    AlarmParam = JsonConvert.DeserializeObject<AlarmParam>(File.ReadAllText(fp1));
+                    if (AlarmParam == null)
+                    {
+                        AlarmParam = new AlarmParam { MaxHurtDistance = 5, MaxDivDistance = 2, MaxErrorDistance = 1.5f, PixelRange=20, ReservedDays=7, TotalLoopCount=0, Velocity=5, YRange=10 };
+                    }
+                }
+            }
+            {
+                string fp = Application.StartupPath + "\\SerialParam.json";
+                if (!File.Exists(fp))  // 判断是否已有相同文件 
+                {
+                    FileStream fs = new FileStream(fp, FileMode.Create, FileAccess.ReadWrite);
+                    fs.Close();
+                }
+                SerialParam = JsonConvert.DeserializeObject<SerialParam>(File.ReadAllText(fp));
+                if (SerialParam == null)
+                {
+                    //读取bak文件
+                    string fp1 = Application.StartupPath + "\\SerialParam_bak.json";
+                    if (!File.Exists(fp1))  // 判断是否已有相同文件 
+                    {
+                        FileStream fs = new FileStream(fp1, FileMode.Create, FileAccess.ReadWrite);
+                        fs.Close();
+                    }
+                    SerialParam = JsonConvert.DeserializeObject<SerialParam>(File.ReadAllText(fp1));
+                    if (SerialParam == null)
+                    {
+                        SerialParam = new SerialParam
+                        {
+                            PortName = "COM1",
+                            BaudRate = 9600,
+                            Parity = System.IO.Ports.Parity.None,
+                            StopBits = System.IO.Ports.StopBits.One,
+                            DataBits = 8
+                        };
+                    }
+                }
+            }
+            {
+                string fp = Application.StartupPath + "\\DetectParam.json";
+                if (!File.Exists(fp))  // 判断是否已有相同文件 
+                {
+                    FileStream fs = new FileStream(fp, FileMode.Create, FileAccess.ReadWrite);
+                    fs.Close();
+                }
+                DetectParam = JsonConvert.DeserializeObject<DetectParam>(File.ReadAllText(fp));
+                if (DetectParam == null)
+                {
+                    //读取bak文件
+                    string fp1 = Application.StartupPath + "\\SerialParam_bak.json";
+                    if (!File.Exists(fp1))  // 判断是否已有相同文件 
+                    {
+                        FileStream fs = new FileStream(fp1, FileMode.Create, FileAccess.ReadWrite);
+                        fs.Close();
+                    }
+                    DetectParam = JsonConvert.DeserializeObject<DetectParam>(File.ReadAllText(fp1));
+                    if (DetectParam == null)
+                    {
+                        DetectParam = new DetectParam { Left = 50, Right = 500, Up = 200, Down = 300, StartY = 260, AlarmWidth = 1.5f, AlarmDepth = 1.5f, CameraNo = 1 };
+                    }
+                }
+            }
+            {
+                string fp = Application.StartupPath + "\\Alarms.json";
+                if (!File.Exists(fp))  // 判断是否已有相同文件 
+                {
+                    FileStream fs = new FileStream(fp, FileMode.Create, FileAccess.ReadWrite);
+                    fs.Close();
+                }
+                Alarms = JsonConvert.DeserializeObject<ObservableCollection<AlarmRecord>>(File.ReadAllText(fp));
+                if (Alarms == null)
+                {
+                    //读取bak文件
+                    string fp1 = Application.StartupPath + "\\Alarms_bak.json";
+                    if (!File.Exists(fp1))  // 判断是否已有相同文件 
+                    {
+                        FileStream fs = new FileStream(fp1, FileMode.Create, FileAccess.ReadWrite);
+                        fs.Close();
+                    }
+                    Alarms = JsonConvert.DeserializeObject<ObservableCollection<AlarmRecord>>(File.ReadAllText(fp1));
+                    if (Alarms == null)
+                    {
+                        Alarms = new ObservableCollection<AlarmRecord>();
+                    }
+                }
+            }
+
+        }
+
         ~Biz()
         {
             if (m_Grabber != IntPtr.Zero)
@@ -193,8 +351,6 @@ namespace 新纵撕检测.ViewModels
                         Console.WriteLine("计算: "+ FrameCount + " 采集: "+ CapCount + " 图片队列: " + ImageQueue.Count);
                         FrameCount = 0;
                         CapCount = 0;
-                        LoopCount += 1;
-                        LoopCount %= AlarmRecord.TotalLoopCount;
                         Thread.Sleep(1000);
                     }
                 });
@@ -207,7 +363,17 @@ namespace 新纵撕检测.ViewModels
                         Image<Bgr, byte> image;
                         if (ImageQueue.TryDequeue(out image))
                         {
-                            algorithmResults = Algorithm.DetectImage(image.Ptr, DetectParam);
+                            stDetectParam = DetectParam.GetSt();
+                            AlarmRecord.SetRange(AlarmParam.PixelRange,AlarmParam.YRange);
+                            App.Current.Dispatcher.Invoke(() =>
+                            {
+                                if (AlarmRecord.TotalLoopCount != AlarmParam.TotalLoopCount)
+                                {
+                                    AlarmRecord.TotalLoopCount = AlarmParam.TotalLoopCount;
+                                    Alarms.Clear();
+                                }
+                            });
+                            algorithmResults = Algorithm.DetectImage(image.Ptr, stDetectParam);
                             List<AlgorithmResult> results = new List<AlgorithmResult>(algorithmResults);
                             results.ForEach(result =>
                             {
@@ -218,34 +384,39 @@ namespace 新纵撕检测.ViewModels
                                 }
                             });
 
-                            if (detectResultStatistics.Count > 0)
+                            lock (this)
                             {
-                                int avgX = 0;
-                                int avgY = 0;
-                                DateTime beginTime = DateTime.MinValue;
-                                TimeSpan maxDuration = FindMaxDuration(out avgX,out avgY,out beginTime);
-                                float length = (float)((maxDuration.Seconds + maxDuration.Milliseconds / 1000.0) * 0.085);
-                                DateTime latestTime = FindLatestTime();
-                                TimeSpan maxErrorTime = TimeSpan.FromSeconds(1);
-                                TimeSpan maxHurtTime = TimeSpan.FromSeconds(1.0);
-                                TimeSpan maxDivTime = TimeSpan.FromSeconds(0.5);
-                                if (DateTime.Now - latestTime > maxErrorTime)
+                                if (detectResultStatistics.Count > 0)
                                 {
-                                    DetectState = DetectResultState.皮带正常;
-                                    detectResultStatistics.Clear();
-                                    AlarmHeadFlag = true;
-                                    AlarmRecord.LoopOffset = LoopOffset;
-                                    beginRecord = null;
-                                    //DrawRectOnScreen(-100, -100);
-                                }
-                                else if (maxDuration > maxHurtTime)//逻辑判断有超过maxHurtTime时间,此时发生撕伤警报
-                                {
-                                    DetectState = DetectResultState.撕伤;
-                                    AddAlarmToStatistics(avgX, avgY, length);
-                                }
-                                else if (maxDuration > maxDivTime)//逻辑判断有超过maxDivTime时间,此时发生撕裂警报
-                                {
-                                    DetectState = DetectResultState.撕裂;
+                                    int avgX = 0;
+                                    int avgY = 0;
+                                    DateTime beginTime = DateTime.MinValue;
+                                    TimeSpan maxDuration = FindMaxDuration(out avgX, out avgY, out beginTime);
+                                    if (avgX == -1)
+                                    {
+                                        return;
+                                    }
+                                    float length = (float)((maxDuration.Seconds + maxDuration.Milliseconds / 1000.0) * 0.085);
+                                    DateTime latestTime = FindLatestTime();
+
+                                    if (DateTime.Now - latestTime > AlarmParam.MaxErrorTime)
+                                    {
+                                        DetectState = DetectResultState.皮带正常;
+                                        detectResultStatistics.Clear();
+                                        AlarmHeadFlag = true;
+                                        AlarmRecord.LoopOffset = LoopOffset;
+                                        beginRecord = null;
+                                        //DrawRectOnScreen(-100, -100);
+                                    }
+                                    else if (maxDuration > AlarmParam.MaxHurtTime)//逻辑判断有超过maxHurtTime时间,此时发生撕伤警报
+                                    {
+                                        DetectState = DetectResultState.撕伤;
+                                        AddAlarmToStatistics(avgX, avgY, length);
+                                    }
+                                    else if (maxDuration > AlarmParam.MaxDivTime)//逻辑判断有超过maxDivTime时间,此时发生撕裂警报
+                                    {
+                                        DetectState = DetectResultState.撕裂;
+                                    }
                                 }
                             }
                             FrameCount++;
@@ -260,8 +431,7 @@ namespace 新纵撕检测.ViewModels
         private void AddAlarmToStatistics(int avgX, int yPic, float length)
         {
             int xPos = avgX;
-            //int yPos = GetLoop();
-            int yPos = LoopCount;
+            int yPos = serialComm.LoopCount%AlarmRecord.TotalLoopCount;
             AlarmRecord alarmRecord = new AlarmRecord { XPos = xPos, YPos = yPos,YPic=yPic, LatestOccurTime = DateTime.Now, Length = length };
 
             App.Current.Dispatcher.Invoke(() =>
@@ -293,6 +463,7 @@ namespace 新纵撕检测.ViewModels
                     Alarm(alarmRecord);
                 }
                 SelectedAlarmIndex = Alarms.IndexOf(alarmRecord);
+                AsyncSaveObject("Alarms", Alarms);
             });
         }
 
@@ -330,14 +501,23 @@ namespace 新纵撕检测.ViewModels
                     detectResultStatistic = item.Value;
                 }
             }
-            avgX = xSum / detectResultStatistics.Count;
-            avgY = ySum / detectResultStatistics.Count;
+            if (detectResultStatistics.Count>0)
+            {
+                avgX = xSum / detectResultStatistics.Count;
+                avgY = ySum / detectResultStatistics.Count;
+            }
+            else
+            {
+                avgX = -1;
+                avgY = -1;
+            }
+
             return maxDuration;
         }
 
         public void AddResultToStatistics(int xPos, int yPos)
         {
-            MyInt myInt = new MyInt(xPos,yPos, AlarmParam.PixelRange);
+            AlarmPos myInt = new AlarmPos(xPos,yPos, AlarmParam.PixelRange);
             TimeSpan maxErrorTime = TimeSpan.FromSeconds(0.5);
             detectResultStatistics.AddOrUpdate(myInt,
                 new DetectResultStatistic
@@ -509,7 +689,7 @@ namespace 新纵撕检测.ViewModels
         public void DrawRectOnScreen(double posX, double posY)
         {
             Margin = new System.Windows.Thickness(posX-32+200, posY-32, 0, 0);
-            Rectangle rect = new Rectangle((int)posX - 32, (int)posY - 32, 64, 64);
+            Rectangle rect = new Rectangle((int)(posX - 32)*3/2, (int)(posY - 32)*3/2, 64*3/2, 64*3/2);
             Pen pen= new Pen(Color.WhiteSmoke, 3);
             switch (DetectState)
             {
@@ -526,6 +706,24 @@ namespace 新纵撕检测.ViewModels
             }
             App.Current.Dispatcher.Invoke(() => {
                 Graphics.FromHwnd(pictureBox.Handle).DrawRectangle(pen, rect);//paintHandle对象提供了画图形的方法，我们只需调用即可
+            });
+        }
+
+        /// <summary>
+        /// 异步保存对象
+        /// </summary>
+        public void AsyncSaveObject(string fileName, object target)
+        {
+            Task.Run(() =>
+            {
+                //保存警报信息
+                string fp = Application.StartupPath + "\\"+ fileName + ".json";
+                string fpBak = Application.StartupPath + "\\"+ fileName + "_bak.json";
+                lock (this)
+                {
+                    File.WriteAllText(fp, JsonConvert.SerializeObject(target));
+                    File.WriteAllText(fpBak, JsonConvert.SerializeObject(target));
+                }
             });
         }
     }

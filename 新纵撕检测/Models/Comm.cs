@@ -28,7 +28,7 @@ namespace 新纵撕检测.Models
         public DateTime PulseIndicate { get; set; }
         public AlarmRecord AlarmRecord { get; set; }
 
-        public SerialComm(SerialParam serialParam)
+        public SerialComm(SerialParam serialParam,int cameraNo)
         {
             Serial = new SerialPort(
                 serialParam.PortName, 
@@ -36,8 +36,10 @@ namespace 新纵撕检测.Models
                 serialParam.Parity, 
                 serialParam.DataBits, 
                 serialParam.StopBits);
+            CameraNo = cameraNo;
             Serial.ReceivedBytesThreshold = 8;
             Serial.DataReceived += Serial_DataReceived;
+            Open();
         }
 
         private void Serial_DataReceived(object sender, SerialDataReceivedEventArgs e)
@@ -100,10 +102,7 @@ namespace 新纵撕检测.Models
                     byte[] pulse = new byte[] { 0x86, 0x00, 0x00, (byte)CameraNo, 0x00, 0x0A };
                     
                     Pulse++;
-                    if (Pulse%5==0)
-                    {
-                        SendData(pulse);
-                    }
+                    SendData(pulse);
                 }
             }
         }
