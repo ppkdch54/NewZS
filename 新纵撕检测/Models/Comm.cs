@@ -145,6 +145,19 @@ namespace 新纵撕检测.Models
                 }
             }
         }
+
+        public void Close()
+        {
+            try
+            {
+                Serial.Close();
+            }
+            catch (Exception ex)
+            {
+
+                throw;
+            }
+        }
         
         public void SendData(Byte[] data)
         {

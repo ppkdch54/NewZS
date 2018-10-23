@@ -97,6 +97,7 @@ namespace 新纵撕检测.ViewModels
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("FrameCount"));
             }
         }
+
         private int CapCount;
         private int LoopOffset = 0;
         private bool AlarmHeadFlag = true;
@@ -106,6 +107,16 @@ namespace 新纵撕检测.ViewModels
         private PictureBox pictureBox;
         public PropertyGrid propertyGrid;
 
+        private int currentLoopCount;
+        public int CurrentLoopCount
+        {
+            get { return currentLoopCount; }
+            set
+            {
+                currentLoopCount = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("CurrentLoopCount"));
+            }
+        }
         public DetectParam DetectParam { get; set; }
         private StDetectParam stDetectParam = new StDetectParam();
         public SerialParam SerialParam { get; set; }
@@ -351,6 +362,7 @@ namespace 新纵撕检测.ViewModels
                         Console.WriteLine("计算: "+ FrameCount + " 采集: "+ CapCount + " 图片队列: " + ImageQueue.Count);
                         FrameCount = 0;
                         CapCount = 0;
+                        CurrentLoopCount = serialComm.LoopCount;
                         Thread.Sleep(1000);
                     }
                 });
@@ -397,7 +409,7 @@ namespace 新纵撕检测.ViewModels
                                     {
                                         return;
                                     }
-                                    float length = (float)((maxDuration.Seconds + maxDuration.Milliseconds / 1000.0) * 0.085);
+                                    float length = (float)((maxDuration.Seconds + maxDuration.Milliseconds / 1000.0) * AlarmParam.Velocity);
                                     DateTime latestTime = FindLatestTime();
 
                                     if (DateTime.Now - latestTime > AlarmParam.MaxErrorTime)
@@ -717,6 +729,11 @@ namespace 新纵撕检测.ViewModels
             });
         }
 
+        internal void ReConnectSerial()
+        {
+            serialComm.Close();
+            serialComm = new SerialComm(SerialParam, DetectParam.CameraNo);
+        }
         /// <summary>
         /// 异步保存数据
         /// </summary>

@@ -95,11 +95,11 @@ namespace 新纵撕检测.Models
         public int YRange { get; set; }
         [Category("报警参数"), DisplayName("报警图片保留天数")]
         public int ReservedDays { get; set; }
-        //[Browsable(false)]
+        [Browsable(false)]
         public TimeSpan MaxErrorTime { get; private set; }
-        //[Browsable(false)]
+        [Browsable(false)]
         public TimeSpan MaxHurtTime { get; private set; }
-        //[Browsable(false)]
+        [Browsable(false)]
         public TimeSpan MaxDivTime { get; private set; }
     }
     public class SerialParam

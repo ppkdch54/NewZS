@@ -33,25 +33,25 @@ namespace 新纵撕检测
 
         private void SwitchSerialParam(object sender, RoutedEventArgs e)
         {
-            if (!mainWindowViewModel.Biz.propertyGrid.SelectedObject.Equals(mainWindowViewModel.Biz.SerialParam))
+            if (!PropertyGrid.SelectedObject.Equals(mainWindowViewModel.Biz.SerialParam))
             {
-                mainWindowViewModel.Biz.propertyGrid.SelectedObject = mainWindowViewModel.Biz.SerialParam;
+                PropertyGrid.SelectedObject = mainWindowViewModel.Biz.SerialParam;
             }
         }
 
         private void SwitchDetectParam(object sender, RoutedEventArgs e)
         {
-            if (!mainWindowViewModel.Biz.propertyGrid.SelectedObject.Equals( mainWindowViewModel.Biz.DetectParam))
+            if (!PropertyGrid.SelectedObject.Equals( mainWindowViewModel.Biz.DetectParam))
             {
-                mainWindowViewModel.Biz.propertyGrid.SelectedObject = mainWindowViewModel.Biz.DetectParam;
+                PropertyGrid.SelectedObject = mainWindowViewModel.Biz.DetectParam;
             }
         }
 
         private void SwitchAlarmParam(object sender, RoutedEventArgs e)
         {
-            if (!mainWindowViewModel.Biz.propertyGrid.SelectedObject.Equals( mainWindowViewModel.Biz.AlarmParam))
+            if (!PropertyGrid.SelectedObject.Equals( mainWindowViewModel.Biz.AlarmParam))
             {
-                mainWindowViewModel.Biz.propertyGrid.SelectedObject = mainWindowViewModel.Biz.AlarmParam;
+                PropertyGrid.SelectedObject = mainWindowViewModel.Biz.AlarmParam;
             }
         }
 
@@ -79,6 +79,10 @@ namespace 新纵撕检测
             mainWindowViewModel.Biz.AsyncSaveObject("AlarmParam", mainWindowViewModel.Biz.AlarmParam);
             mainWindowViewModel.Biz.AsyncSaveObject("DetectParam", mainWindowViewModel.Biz.DetectParam);
             mainWindowViewModel.Biz.AsyncSaveObject("SerialParam", mainWindowViewModel.Biz.SerialParam);
+            if (PropertyGrid.SelectedObject == mainWindowViewModel.Biz.SerialParam)
+            {
+                mainWindowViewModel.Biz.ReConnectSerial();
+            }
         }
 
         private void CMD_KeyUp(object sender, KeyEventArgs e)

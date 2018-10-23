@@ -33,7 +33,13 @@
                     <Label Name="lbMousePos"/>
                     
                 </WrapPanel>
-                <Label Content="{Binding Biz.FrameCount}" HorizontalAlignment="Right"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Label Content="当前圈数: "/>
+                    <Label Content="{Binding Biz.CurrentLoopCount}" />
+                    <Label Content="帧率: "/>
+                    <Label Content="{Binding Biz.FrameCount}" />
+                </StackPanel>
+
             </Grid>
         </Grid>
         <Grid Grid.Row="1">
