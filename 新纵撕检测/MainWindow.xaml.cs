@@ -1,7 +1,10 @@
 ﻿using System;
 using System.Drawing;
+using System.IO;
+using System.Linq;
 using System.Windows;
 using System.Windows.Input;
+using 新纵撕检测.Models;
 using 新纵撕检测.ViewModels;
 
 namespace 新纵撕检测
@@ -147,13 +150,52 @@ namespace 新纵撕检测
             }
             Pen pen = new Pen(Color.LightSkyBlue, 5);
             Rectangle rect = new Rectangle
-  (
-      Math.Min(startPoint.X, endPoint.X),
-      Math.Min(startPoint.Y, endPoint.Y),
-      Math.Abs(startPoint.X - endPoint.X),
-      Math.Abs(startPoint.Y - endPoint.Y)
-  );
+            (
+                Math.Min(startPoint.X, endPoint.X),
+                Math.Min(startPoint.Y, endPoint.Y),
+                Math.Abs(startPoint.X - endPoint.X),
+                Math.Abs(startPoint.Y - endPoint.Y)
+            );
             Graphics.FromHwnd(PreviewBox.Handle).DrawRectangle(pen, rect);
+        }
+
+        private void HistoryHurts_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            if (HistoryHurts.SelectedItems.Count>0)
+            {
+                AlarmRecord alarmRecord = HistoryHurts.SelectedItem as AlarmRecord;
+                ShowAlarmPic(alarmRecord);
+            }
+        }
+
+        private void ShowAlarmPic(AlarmRecord alarmRecord)
+        {
+            //建立新的系统进程      
+            System.Diagnostics.Process process = new System.Diagnostics.Process();
+            //设置图片的真实路径和文件名
+            DateTime createdTime = alarmRecord.CreatedTime;
+            int x = alarmRecord.XPos;
+            int y = alarmRecord.YPic;
+            string picName = x + "_" + y + "_" + createdTime.ToString("hh_mm_ss.fff");
+            string imageFolder = "C:\\Alarm_Pic\\pic_" + createdTime.ToString("yyyy_MM_dd") + "\\下位机_" + mainWindowViewModel.Biz.DetectParam.CameraNo.ToString() + "_报警截图\\";
+            var images = Directory.GetFiles(imageFolder);
+            string picPath = Path.Combine(imageFolder, picName);
+            var image = images.SingleOrDefault(i => i.StartsWith(picPath));
+            if (image == null || !File.Exists(image)) { return; }
+            try
+            {
+                process.StartInfo.FileName = image;
+                process.StartInfo.Arguments = "rundl132.exe C://WINDOWS//system32//shimgvw.dll,ImageView_Fullscreen";     
+                process.StartInfo.UseShellExecute = true;
+                process.Start();
+            }
+            catch (Exception ex)
+            {
+                App.Current?.Dispatcher.Invoke(() =>
+                {
+                    MessageBox.Show(ex.Message, "提示", MessageBoxButton.OK);
+                });
+            }
         }
     }
 }

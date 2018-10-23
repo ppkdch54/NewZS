@@ -18,7 +18,6 @@
             <Grid Background="Orchid" Grid.Row="0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition/>
-                    <ColumnDefinition Width="80"/>
                 </Grid.ColumnDefinitions>
                 <WrapPanel VerticalAlignment="Stretch">
 
@@ -32,7 +31,9 @@
                     </WrapPanel>
                     <Label Content="{Binding Biz.DetectState}" />
                     <Label Name="lbMousePos"/>
+                    
                 </WrapPanel>
+                <Label Content="{Binding Biz.FrameCount}" HorizontalAlignment="Right"/>
             </Grid>
         </Grid>
         <Grid Grid.Row="1">
@@ -50,7 +51,7 @@
                 </WindowsFormsHost>
                 <Image Name="imageC" Width="640" Height="480" HorizontalAlignment="Left" VerticalAlignment="Top" Source="{Binding Biz.PreviewImage}" MouseMove="Image_MouseMove" />
 
-                <ListView Name="HistoryHurts" ItemsSource="{Binding Biz.Alarms}" Grid.Column="1" Width="Auto" HorizontalAlignment="Right" VerticalAlignment="Stretch" SelectedIndex="{Binding Biz.SelectedAlarmIndex}" HorizontalContentAlignment="Stretch">
+                <ListView Name="HistoryHurts" ItemsSource="{Binding Biz.Alarms}" Grid.Column="1" Width="Auto" HorizontalAlignment="Right" VerticalAlignment="Stretch" SelectedIndex="{Binding Biz.SelectedAlarmIndex}" HorizontalContentAlignment="Stretch" MouseDoubleClick="HistoryHurts_MouseDoubleClick">
                     <ListView.View>
                         <GridView>
                             <GridViewColumn Header="水平坐标" DisplayMemberBinding="{Binding XPos}" />

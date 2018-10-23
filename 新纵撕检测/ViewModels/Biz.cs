@@ -29,7 +29,7 @@ namespace 新纵撕检测.ViewModels
         pfnCameraGrabberFrameCallback m_FrameCallback;
         public event PropertyChangedEventHandler PropertyChanged;
 
-        public bool DetectFlag { get; private set; } = true;
+        public bool DetectFlag { get; set; } = true;
         public bool IsAlarm { get; set; }
         private Image<Bgr, Byte> Image = new Image<Bgr, Byte>(ImageSize);
         public ConcurrentQueue<Image<Bgr, Byte>> ImageQueue { get; set; } = new ConcurrentQueue<Image<Bgr, byte>>();
@@ -365,7 +365,8 @@ namespace 新纵撕检测.ViewModels
                         {
                             stDetectParam = DetectParam.GetSt();
                             AlarmRecord.SetRange(AlarmParam.PixelRange,AlarmParam.YRange);
-                            App.Current.Dispatcher.Invoke(() =>
+
+                            App.Current?.Dispatcher.Invoke(() =>
                             {
                                 if (AlarmRecord.TotalLoopCount != AlarmParam.TotalLoopCount)
                                 {
@@ -432,15 +433,15 @@ namespace 新纵撕检测.ViewModels
         {
             int xPos = avgX;
             int yPos = serialComm.LoopCount%AlarmRecord.TotalLoopCount;
-            AlarmRecord alarmRecord = new AlarmRecord { XPos = xPos, YPos = yPos,YPic=yPic, LatestOccurTime = DateTime.Now, Length = length };
+            AlarmRecord alarmRecord = new AlarmRecord { XPos = xPos, YPos = yPos,YPic=yPic, LatestOccurTime = DateTime.Now, CreatedTime=DateTime.Now, Length = length };
 
-            App.Current.Dispatcher.Invoke(() =>
+            App.Current?.Dispatcher.Invoke(() =>
             {
                 if (Alarms.Contains(alarmRecord))
                 {
                     int index = Alarms.IndexOf(alarmRecord);
                     var alarm = Alarms[index];
-                    alarm.XPos = alarmRecord.XPos;
+                    //alarm.XPos = alarmRecord.XPos;
                     if (AlarmHeadFlag)
                     {
                         if (firstAlarmRecord==null)
@@ -488,6 +489,8 @@ namespace 新纵撕检测.ViewModels
             beginTime = DateTime.MinValue;
             int xSum = 0;
             int ySum = 0;
+            avgX = 0;
+            avgY = 0;
             //遍历查找计时最长的撕裂点记录
             DetectResultStatistic detectResultStatistic = null;
             foreach (var item in detectResultStatistics)
@@ -499,12 +502,14 @@ namespace 新纵撕检测.ViewModels
                     maxDuration = DateTime.Now - item.Value.beginTimeStamp;
                     beginTime = item.Value.beginTimeStamp;
                     detectResultStatistic = item.Value;
+                    avgX = item.Key.XPos;
+                    avgY = item.Key.YPos;
                 }
             }
             if (detectResultStatistics.Count>0)
             {
-                avgX = xSum / detectResultStatistics.Count;
-                avgY = ySum / detectResultStatistics.Count;
+                //avgX = xSum / detectResultStatistics.Count;
+                //avgY = ySum / detectResultStatistics.Count;
             }
             else
             {
@@ -704,13 +709,16 @@ namespace 新纵撕检测.ViewModels
                 default:
                     break;
             }
-            App.Current.Dispatcher.Invoke(() => {
-                Graphics.FromHwnd(pictureBox.Handle).DrawRectangle(pen, rect);//paintHandle对象提供了画图形的方法，我们只需调用即可
+            App.Current?.Dispatcher.Invoke(() => {
+                if (pictureBox!=null)
+                {
+                    Graphics.FromHwnd(pictureBox.Handle).DrawRectangle(pen, rect);//paintHandle对象提供了画图形的方法，我们只需调用即可
+                }
             });
         }
 
         /// <summary>
-        /// 异步保存对象
+        /// 异步保存数据
         /// </summary>
         public void AsyncSaveObject(string fileName, object target)
         {

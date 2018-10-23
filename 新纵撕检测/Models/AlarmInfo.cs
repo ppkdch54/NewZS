@@ -36,7 +36,7 @@ namespace 新纵撕检测.Models
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("Length"));
             }
         }//撕伤长度,单位(m)
-        public DateTime CreatedTime { get;}//第一次报警时间
+        public DateTime CreatedTime { get; set; }//第一次报警时间
         private DateTime latestOccurTime;
         public DateTime LatestOccurTime
         {
@@ -54,10 +54,6 @@ namespace 新纵撕检测.Models
         public static int LoopOffset { get; set; } = 0;
         public static int TotalLoopCount { get; set; } = int.MaxValue;
 
-        public AlarmRecord()
-        {
-            CreatedTime = DateTime.Now;
-        }
         public event PropertyChangedEventHandler PropertyChanged;
 
         public override bool Equals(object obj)
