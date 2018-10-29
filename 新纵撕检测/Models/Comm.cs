@@ -57,7 +57,7 @@ namespace 新纵撕检测.Models
             {
                 data[i] = buffer[i];
             }
-            byte[] crc = crc_16(data);
+            byte[] crc = CRC16(data);
             if (crc[1]!=buffer[bufferSize - 2] ||crc[0]!=buffer[bufferSize - 1])
             {
                 //CRC校验失败,不处理该数据
@@ -159,12 +159,12 @@ namespace 新纵撕检测.Models
             }
         }
         
-        public void SendData(Byte[] data)
+        public void SendData(byte[] data)
         {
             Open();
             try
             {
-                byte[] crc = crc_16(data);
+                byte[] crc = CRC16(data);
                 byte[] sendData = new byte[data.Length + 2];
                 data.CopyTo(sendData, 0);
                 sendData[sendData.Length - 2] = crc[1];
@@ -234,7 +234,7 @@ namespace 新纵撕检测.Models
             }
         }
 
-        public static byte[] crc_16(byte[] data)
+        public static byte[] CRC16(byte[] data)
         {
             uint IX, IY;
             ushort crc = 0xFFFF;//set all 1
@@ -267,7 +267,7 @@ namespace 新纵撕检测.Models
             return new byte[] { buf1, buf2 };
         }
 
-        public static string ToHexString(byte[] bytes)
+        public static string BytesToHex(byte[] bytes)
         {
             string byteStr = string.Empty;
             if (bytes != null || bytes.Length > 0)

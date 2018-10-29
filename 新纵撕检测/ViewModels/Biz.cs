@@ -377,12 +377,13 @@ namespace 新纵撕检测.ViewModels
                             stDetectParam = DetectParam.GetSt();
                             AlarmRecord.SetRange(AlarmParam.PixelRange,AlarmParam.YRange);
 
-                            App.Current?.Dispatcher.Invoke(() =>
+                            App.Current?.Dispatcher?.Invoke(() =>
                             {
                                 if (AlarmRecord.TotalLoopCount != AlarmParam.TotalLoopCount)
                                 {
                                     AlarmRecord.TotalLoopCount = AlarmParam.TotalLoopCount;
                                     Alarms.Clear();
+                                    AsyncSaveObject("Alarms", Alarms);
                                 }
                             });
                             algorithmResults = Algorithm.DetectImage(image.Ptr, stDetectParam);
@@ -555,14 +556,6 @@ namespace 新纵撕检测.ViewModels
                     return y;
                 }
                 );
-        }
-
-        public void SetLoopCountOfBelt()
-        { }
-
-        public bool IsOldRecord()
-        {
-            return false;
         }
 
         public void Alarm(AlarmRecord alarmRecord)

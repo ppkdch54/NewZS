@@ -48,7 +48,7 @@
                 <ColumnDefinition Width="665*"/>
             </Grid.ColumnDefinitions>
             <Border Name="RectBorder" BorderBrush="Red" BorderThickness="2"  Height="64"  Width="64" Margin="{Binding Biz.Margin}" HorizontalAlignment="Left" VerticalAlignment="Top" Panel.ZIndex="10"/>
-            <StackPanel Orientation="Horizontal" Grid.ColumnSpan="2" Margin="0,0,-0.4,0.4">
+            <StackPanel Orientation="Horizontal" Grid.ColumnSpan="2" Margin="0">
                 <WindowsFormsHost x:Name="pgFormhost" Width="200" Visibility="Collapsed">
                     <forms:PropertyGrid x:Name="PropertyGrid" Width="200" PropertyValueChanged="PropertyGrid_PropertyValueChanged" PropertySort="NoSort"/>
                 </WindowsFormsHost>
@@ -57,7 +57,7 @@
                 </WindowsFormsHost>
                 <Image Name="imageC" Width="640" Height="480" HorizontalAlignment="Left" VerticalAlignment="Top" Source="{Binding Biz.PreviewImage}" MouseMove="Image_MouseMove" />
 
-                <ListView Name="HistoryHurts" ItemsSource="{Binding Biz.Alarms}" Grid.Column="1" Width="Auto" HorizontalAlignment="Right" VerticalAlignment="Stretch" SelectedIndex="{Binding Biz.SelectedAlarmIndex}" HorizontalContentAlignment="Stretch" MouseDoubleClick="HistoryHurts_MouseDoubleClick">
+                <ListView Name="HistoryHurts" ItemsSource="{Binding Biz.Alarms}" Grid.Column="1" SelectedIndex="{Binding Biz.SelectedAlarmIndex}" HorizontalContentAlignment="Stretch" MouseDoubleClick="HistoryHurts_MouseDoubleClick">
                     <ListView.View>
                         <GridView>
                             <GridViewColumn Header="水平坐标" DisplayMemberBinding="{Binding XPos}" />
