@@ -16,7 +16,6 @@ using System.Timers;
 using System.Windows.Forms;
 using System.Windows.Media.Imaging;
 using 新纵撕检测.Models;
-using 纵撕检测.Models;
 
 namespace 新纵撕检测.ViewModels
 {
@@ -31,8 +30,8 @@ namespace 新纵撕检测.ViewModels
 
         public bool DetectFlag { get; set; } = true;
         public bool IsAlarm { get; set; }
-        private Image<Bgr, Byte> Image = new Image<Bgr, Byte>(ImageSize);
-        public ConcurrentQueue<Image<Bgr, Byte>> ImageQueue { get; set; } = new ConcurrentQueue<Image<Bgr, byte>>();
+        private Image<Bgr, byte> Image = new Image<Bgr, byte>(ImageSize);
+        public ConcurrentQueue<Image<Bgr, byte>> ImageQueue { get; set; } = new ConcurrentQueue<Image<Bgr, byte>>();
         private class AlarmPos
         {
             public int XPos { get; set; }
@@ -570,7 +569,7 @@ namespace 新纵撕检测.ViewModels
         {
             SendGPIOSignal();
             SendAlarmInfo(alarmRecord);
-            SaveCurrentImage(alarmRecord);
+            SaveAlarmImage(alarmRecord);
         }
 
         private void SendAlarmInfo(AlarmRecord alarmRecord)
@@ -590,7 +589,7 @@ namespace 新纵撕检测.ViewModels
             });
         }
 
-        private void SaveCurrentImage(AlarmRecord alarmRecord)
+        private void SaveAlarmImage(AlarmRecord alarmRecord)
         {
             string picName = alarmRecord.XPos + "_" + alarmRecord.YPic + "_";
             string destFolder = "C:\\Alarm_Pic\\pic_" + alarmRecord.CreatedTime.ToString("yyyy_MM_dd") + "\\下位机_" + DetectParam.CameraNo + "_报警截图\\";
@@ -606,7 +605,7 @@ namespace 新纵撕检测.ViewModels
             image.Bitmap.Save(destFolder + destFileName);
         }
 
-        private void SaveCurrentImageVideo(AlarmRecord alarmRecord, DateTime beginTime,AlarmRecord beginRecord)
+        private void SaveAlarmVideo(AlarmRecord alarmRecord, DateTime beginTime,AlarmRecord beginRecord)
         {
             string picName = alarmRecord.XPos + "_" + alarmRecord.YPic + "_";
             string destFolder = "C:\\Alarm_Video\\pic_" + beginRecord.CreatedTime.ToString("yyyy_MM_dd") + "\\下位机_" + DetectParam.CameraNo + "_报警截图\\"+ picName + beginRecord.CreatedTime.ToString("hh_mm_ss.fff") + "_AlarmPic\\";

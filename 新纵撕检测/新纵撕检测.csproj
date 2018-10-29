@@ -103,9 +103,7 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
-    <Compile Include="Models\AlarmInfo.cs" />
     <Compile Include="Models\Algorithm.cs" />
-    <Compile Include="Models\AlgorithmResult.cs" />
     <Compile Include="Models\Comm.cs" />
     <Compile Include="Models\GPIO.cs" />
     <Compile Include="Models\Params.cs" />

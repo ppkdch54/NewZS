@@ -2,7 +2,6 @@
 using System.ComponentModel;
 using System.IO.Ports;
 using System.Runtime.InteropServices;
-using System.Xml.Serialization;
 
 namespace 新纵撕检测.Models
 {
@@ -163,6 +162,97 @@ namespace 新纵撕检测.Models
                 AlarmDepth = AlarmDepth
             };
             return stDetectParam;
+        }
+    }
+    /// <summary>
+    /// 返回报警信息
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential)]
+    public struct AlgorithmResult
+    {
+        public int camNumber;         //哪个相机，0左，2右，1中
+        public int xPos;              //距左边的像素点
+        public int yPos;              //像素点纵坐标
+        public int type;              //1表示断，2表示撕，//改成帧号
+        public int alarmWidth;        //报警的 宽度和高度
+        public byte bStop;            //撕裂中表示衰减阈值是否达到，撕伤中表示深度是否达到停带，true表示停带数据，false表示报警数据
+        public byte bWidthReachStop;  //宽度是否达到停带，true表示达到停带，false表示未达到
+    }
+    public class AlarmRecord : INotifyPropertyChanged
+    {
+        private int xPos;
+        public int XPos
+        {
+            get { return xPos; }
+            set
+            {
+                xPos = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("XPos"));
+            }
+        }//撕伤距离左边界的位置
+        public int YPic { get; set; }
+        private int yPos;
+        public int YPos
+        {
+            get { return yPos; }
+            set
+            {
+                yPos = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("YPos"));
+            }
+        }//撕伤在皮带上的圈数表示
+        private float length;
+        public float Length
+        {
+            get { return length; }
+            set
+            {
+                length = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("Length"));
+            }
+        }//撕伤长度,单位(m)
+        public DateTime CreatedTime { get; set; }//第一次报警时间
+        private DateTime latestOccurTime;
+        public DateTime LatestOccurTime
+        {
+            get { return latestOccurTime; }
+            set
+            {
+                latestOccurTime = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("LatestOccurTime"));
+            }
+        }//最新报警时间
+
+        static int xRange = 0;
+        static int yRange = 0;
+
+        public static int LoopOffset { get; set; } = 0;
+        public static int TotalLoopCount { get; set; } = int.MaxValue;
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        public override bool Equals(object obj)
+        {
+            var tmp = obj as AlarmRecord;
+            if (tmp == null)
+            {
+                return false;
+            }
+            if (Math.Abs(tmp.XPos - XPos) <= xRange &&
+                (
+                (Math.Abs(tmp.YPos - YPos - LoopOffset) % TotalLoopCount <= yRange) ||
+                Math.Abs(tmp.YPos - YPos - LoopOffset) % TotalLoopCount >= TotalLoopCount - yRange)
+                )
+            {
+                return true;
+            }
+            return false;
+        }
+
+        public static void SetRange(int _x, int _y)
+        {
+            xRange = _x;
+            yRange = _y;
         }
     }
 }

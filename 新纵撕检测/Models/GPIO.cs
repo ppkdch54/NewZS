@@ -1,7 +1,7 @@
 ﻿using System.Runtime.InteropServices;
 using CameraHandle = System.Int32;
 
-namespace 纵撕检测.Models
+namespace 新纵撕检测.Models
 {
     class GPIO
     {
