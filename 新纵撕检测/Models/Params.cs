@@ -1,4 +1,7 @@
-﻿using System;
+﻿using Emgu.CV;
+using Emgu.CV.Structure;
+using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO.Ports;
 using System.Runtime.InteropServices;
@@ -19,6 +22,7 @@ namespace 新纵撕检测.Models
     {
         public DateTime endTimeStamp;
         public DateTime beginTimeStamp;
+        public List<Image<Bgr, byte>> ImageStore = new List<Image<Bgr, byte>>();
     }
     public class AlarmParam
     {

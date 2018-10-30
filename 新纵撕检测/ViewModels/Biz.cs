@@ -23,7 +23,6 @@ namespace 新纵撕检测.ViewModels
     {
         private VideoCapture capture;
         private IntPtr m_Grabber;
-
         static Size ImageSize = new Size(640, 480);
         pfnCameraGrabberFrameCallback m_FrameCallback;
         public event PropertyChangedEventHandler PropertyChanged;
@@ -102,9 +101,10 @@ namespace 新纵撕检测.ViewModels
         private bool AlarmHeadFlag = true;
         private AlarmRecord firstAlarmRecord = null;
         private SerialComm serialComm;
+        Random random = new Random();
 
         private PictureBox pictureBox;
-        public PropertyGrid propertyGrid;
+        private PropertyGrid propertyGrid;
 
         private int currentLoopCount;
         public int CurrentLoopCount
@@ -130,6 +130,8 @@ namespace 新纵撕检测.ViewModels
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("DetectState"));
             }
         }
+
+        private bool SaveFlag;
         private int selectedAlarmIndex;
         public int SelectedAlarmIndex
         {
@@ -326,7 +328,6 @@ namespace 新纵撕检测.ViewModels
                     }
                 }
             }
-
         }
 
         ~Biz()
@@ -366,7 +367,6 @@ namespace 新纵撕检测.ViewModels
                     }
                 });
                 AlgorithmResult[] algorithmResults;
-                AlarmRecord beginRecord = null;
                 while (DetectFlag)
                 {
                     Task.Run(() =>
@@ -393,7 +393,7 @@ namespace 新纵撕检测.ViewModels
                                 if (result.bStop != 0 || result.bWidthReachStop != 0)
                                 {
                                     DrawRectOnScreen(result.xPos, result.yPos);
-                                    AddResultToStatistics(result.xPos,result.yPos);
+                                    AddResultToStatistics(result.xPos,result.yPos,image.Clone());
                                 }
                             });
 
@@ -404,7 +404,8 @@ namespace 新纵撕检测.ViewModels
                                     int avgX = 0;
                                     int avgY = 0;
                                     DateTime beginTime = DateTime.MinValue;
-                                    TimeSpan maxDuration = FindMaxDuration(out avgX, out avgY, out beginTime);
+                                    DetectResultStatistic detectResultStatistic = null;
+                                    TimeSpan maxDuration = FindMaxDuration(out avgX, out avgY, out beginTime,out detectResultStatistic);
                                     if (avgX == -1)
                                     {
                                         return;
@@ -415,16 +416,19 @@ namespace 新纵撕检测.ViewModels
                                     if (DateTime.Now - latestTime > AlarmParam.MaxErrorTime)
                                     {
                                         DetectState = DetectResultState.皮带正常;
-                                        detectResultStatistics.Clear();
                                         AlarmHeadFlag = true;
                                         AlarmRecord.LoopOffset = LoopOffset;
-                                        beginRecord = null;
-                                        //DrawRectOnScreen(-100, -100);
+                                        if (SaveFlag)
+                                        {
+                                            SaveFlag = false;
+                                            SaveAlarmVideo();
+                                        }
+                                        detectResultStatistics.Clear();
                                     }
                                     else if (maxDuration > AlarmParam.MaxHurtTime)//逻辑判断有超过maxHurtTime时间,此时发生撕伤警报
                                     {
                                         DetectState = DetectResultState.撕伤;
-                                        AddAlarmToStatistics(avgX, avgY, length);
+                                        AddAlarmToStatistics(avgX, avgY, length, detectResultStatistic);
                                     }
                                     else if (maxDuration > AlarmParam.MaxDivTime)//逻辑判断有超过maxDivTime时间,此时发生撕裂警报
                                     {
@@ -441,11 +445,11 @@ namespace 新纵撕检测.ViewModels
             });
         }
 
-        private void AddAlarmToStatistics(int avgX, int yPic, float length)
+        private void AddAlarmToStatistics(int avgX, int yPic, float length, DetectResultStatistic detectResultStatistic)
         {
             int xPos = avgX;
-            int yPos = serialComm.LoopCount%AlarmRecord.TotalLoopCount;
-            AlarmRecord alarmRecord = new AlarmRecord { XPos = xPos, YPos = yPos,YPic=yPic, LatestOccurTime = DateTime.Now, CreatedTime=DateTime.Now, Length = length };
+            int yPos = serialComm.LoopCount % AlarmRecord.TotalLoopCount;
+            AlarmRecord alarmRecord = new AlarmRecord { XPos = xPos, YPos = yPos, YPic = yPic, LatestOccurTime = DateTime.Now, CreatedTime = DateTime.Now, Length = length };
 
             App.Current?.Dispatcher.Invoke(() =>
             {
@@ -456,11 +460,11 @@ namespace 新纵撕检测.ViewModels
                     //alarm.XPos = alarmRecord.XPos;
                     if (AlarmHeadFlag)
                     {
-                        if (firstAlarmRecord==null)
+                        if (firstAlarmRecord == null)
                         {
                             firstAlarmRecord = alarmRecord;
                         }
-                        if (firstAlarmRecord==alarmRecord)
+                        if (firstAlarmRecord == alarmRecord)
                         {
                             LoopOffset = alarmRecord.YPos - alarm.YPos;
                         }
@@ -494,7 +498,7 @@ namespace 新纵撕检测.ViewModels
             return latestTime;
         }
 
-        private TimeSpan FindMaxDuration(out int avgX, out int avgY, out DateTime beginTime)
+        private TimeSpan FindMaxDuration(out int avgX, out int avgY, out DateTime beginTime,out DetectResultStatistic detectResultStatistic)
         {
             //撕裂点最长的时间
             TimeSpan maxDuration = TimeSpan.Zero;
@@ -503,8 +507,7 @@ namespace 新纵撕检测.ViewModels
             int ySum = 0;
             avgX = 0;
             avgY = 0;
-            //遍历查找计时最长的撕裂点记录
-            DetectResultStatistic detectResultStatistic = null;
+            detectResultStatistic = null;
             foreach (var item in detectResultStatistics)
             {
                 xSum += item.Key.XPos;
@@ -532,9 +535,9 @@ namespace 新纵撕检测.ViewModels
             return maxDuration;
         }
 
-        public void AddResultToStatistics(int xPos, int yPos)
+        public void AddResultToStatistics(int xPos, int yPos, Image<Bgr, byte> image)
         {
-            AlarmPos myInt = new AlarmPos(xPos,yPos, AlarmParam.PixelRange);
+            AlarmPos myInt = new AlarmPos(xPos, yPos, AlarmParam.PixelRange);
             TimeSpan maxErrorTime = TimeSpan.FromSeconds(0.5);
             detectResultStatistics.AddOrUpdate(myInt,
                 new DetectResultStatistic
@@ -556,10 +559,12 @@ namespace 新纵撕检测.ViewModels
                     return y;
                 }
                 );
+            detectResultStatistics[myInt].ImageStore.Add(image);
         }
 
         public void Alarm(AlarmRecord alarmRecord)
         {
+            SaveFlag = true;
             SendGPIOSignal();
             SendAlarmInfo(alarmRecord);
             SaveAlarmImage(alarmRecord);
@@ -598,20 +603,34 @@ namespace 新纵撕检测.ViewModels
             image.Bitmap.Save(destFolder + destFileName);
         }
 
-        private void SaveAlarmVideo(AlarmRecord alarmRecord, DateTime beginTime,AlarmRecord beginRecord)
+        private void SaveAlarmVideo()
         {
+            AlarmRecord alarmRecord = new AlarmRecord()
+            {
+                CreatedTime = DateTime.Now,
+                LatestOccurTime = DateTime.Now,
+            };
             string picName = alarmRecord.XPos + "_" + alarmRecord.YPic + "_";
-            string destFolder = "C:\\Alarm_Video\\pic_" + beginRecord.CreatedTime.ToString("yyyy_MM_dd") + "\\下位机_" + DetectParam.CameraNo + "_报警截图\\"+ picName + beginRecord.CreatedTime.ToString("hh_mm_ss.fff") + "_AlarmPic\\";
+            string destFolder = "C:\\Alarm_Video\\pic_" + alarmRecord.CreatedTime.ToString("yyyy_MM_dd") + "\\下位机_" + DetectParam.CameraNo + "_报警截图\\"+ picName + alarmRecord.CreatedTime.ToString("hh_mm_ss.fff") + "_AlarmPic\\";
             if (!Directory.Exists(destFolder))
             {
                 Directory.CreateDirectory(destFolder);
             }
-            string destFileName = alarmRecord.CreatedTime.ToString("hh_mm_ss.fff")+".bmp";
-            string destFile = destFolder + destFileName;
-
-            var image = Image.Clone();
-            image.Draw(new Rectangle(alarmRecord.XPos - 32, alarmRecord.YPic - 32, 64, 64), new Bgr(Color.Red), 3);
-            image.Bitmap.Save(destFile);
+            int num = random.Next();
+            ConcurrentDictionary<AlarmPos, DetectResultStatistic> temp = new ConcurrentDictionary<AlarmPos, DetectResultStatistic>(detectResultStatistics);
+            Task.Run(() =>
+            {
+                foreach (var detectResultStatistic in temp.Values)
+                {
+                    foreach (var image in detectResultStatistic.ImageStore)
+                    {
+                        string destFileName = DateTime.Now.ToString("hh_mm_ss.fff") + num++ + ".bmp";
+                        string destFile = destFolder + destFileName;
+                        //image.Draw(new Rectangle(alarmRecord.XPos - 32, alarmRecord.YPic - 32, 64, 64), new Bgr(Color.Red), 3);
+                        image.Bitmap.Save(destFile);
+                    }
+                }
+            });
         }
 
         private bool InitCamera()
@@ -713,7 +732,7 @@ namespace 新纵撕检测.ViewModels
                 default:
                     break;
             }
-            App.Current?.Dispatcher.Invoke(() => {
+            App.Current?.Dispatcher?.Invoke(() => {
                 if (pictureBox!=null)
                 {
                     Graphics.FromHwnd(pictureBox.Handle).DrawRectangle(pen, rect);//paintHandle对象提供了画图形的方法，我们只需调用即可
