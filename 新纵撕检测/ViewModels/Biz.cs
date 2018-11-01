@@ -147,29 +147,28 @@ namespace 新纵撕检测.ViewModels
         {
             pictureBox = mainWindow.PreviewBox;
             propertyGrid = mainWindow.PropertyGrid;
+            LoadParams();
+            propertyGrid.SelectedObject = DetectParam;
+            serialComm = new SerialComm(SerialParam, DetectParam.CameraNo);
+            AlarmRecord.TotalLoopCount = AlarmParam.TotalLoopCount;
 
             if (InitCamera())
             {
                 mainWindow.imageC.Visibility = System.Windows.Visibility.Collapsed;
-                mainWindow.RectBorder.Visibility= System.Windows.Visibility.Collapsed;
+                mainWindow.RectBorder.Visibility = System.Windows.Visibility.Collapsed;
             }
             else
             {
                 InitLocalCamera();
                 mainWindow.pbFormhost.Visibility = System.Windows.Visibility.Collapsed;
             }
-            
-            LoadParams();
-            AlarmRecord.TotalLoopCount = AlarmParam.TotalLoopCount;
-            serialComm = new SerialComm(SerialParam,DetectParam.CameraNo);
-            propertyGrid.SelectedObject = DetectParam;
+
             StartDetect();
             Task.Run(() =>
             {
                 Algorithm.svm_start();
                 AutoDeletePics();
             });
-
         }
 
         private void AutoDeletePics()

@@ -75,7 +75,6 @@
                         </GridView>
                     </ListView.View>
                 </ListView>
-
                 <!--<ui:MainUIControl x:Name="MainUI"/>-->
             </Grid>
         </Grid>
