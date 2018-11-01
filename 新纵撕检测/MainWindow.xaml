@@ -57,12 +57,9 @@
                     <ColumnDefinition Width="960"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <WindowsFormsHost x:Name="pbFormhost">
-                    <forms:PictureBox x:Name="PreviewBox" Width="960" Height="720" MouseMove="PreviewBox_MouseMove" MouseDown="PreviewBox_MouseDown" MouseUp="PreviewBox_MouseUp"></forms:PictureBox>
-                </WindowsFormsHost>
                 <Border Name="RectBorder" BorderBrush="Red" BorderThickness="2"  Height="64"  Width="64" Margin="{Binding Biz.Margin}" HorizontalAlignment="Left" VerticalAlignment="Top" Panel.ZIndex="10"/>
 
-                <Image Name="imageC" Width="960" Height="720" HorizontalAlignment="Left" VerticalAlignment="Top" Source="{Binding Biz.PreviewImage}" MouseMove="Image_MouseMove" MouseLeftButtonDown="Image_MouseDown" MouseLeftButtonUp="Image_MouseUp"/>
+                <Image x:Name="imageC" Width="960" Height="720" Source="{Binding Biz.PreviewImage}" HorizontalAlignment="Left" VerticalAlignment="Top" MouseMove="Image_MouseMove" MouseLeftButtonDown="Image_MouseDown" MouseLeftButtonUp="Image_MouseUp"/>
 
                 <ListView Name="HistoryHurts" HorizontalAlignment="Stretch" ItemsSource="{Binding Biz.Alarms}" Grid.Column="1" SelectedIndex="{Binding Biz.SelectedAlarmIndex}" MouseDoubleClick="HistoryHurts_MouseDoubleClick">
                     <ListView.View>

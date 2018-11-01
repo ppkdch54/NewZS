@@ -44,7 +44,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'ReleaseSingleRemote|AnyCPU'">
     <DebugSymbols>true</DebugSymbols>
-    <OutputPath>\\192.168.1.60\Users\Admin\Desktop\xinZs\Release\</OutputPath>
+    <OutputPath>\\192.168.1.101\Users\Admin\Desktop\xinZs\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <DebugType>pdbonly</DebugType>
     <PlatformTarget>AnyCPU</PlatformTarget>

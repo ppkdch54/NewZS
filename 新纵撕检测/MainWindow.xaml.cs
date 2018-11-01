@@ -173,7 +173,7 @@ namespace 新纵撕检测
                 Math.Abs(startPoint.X - endPoint.X),
                 Math.Abs(startPoint.Y - endPoint.Y)
             );
-            Graphics.FromHwnd(PreviewBox.Handle).DrawRectangle(pen, rect);
+            //Graphics.FromHwnd(PreviewBox.Handle).DrawRectangle(pen, rect);
             //Graphics.FromHwnd(((HwndSource)PresentationSource.FromVisual(imageC)).Handle).DrawRectangle(pen, rect);
         }
 

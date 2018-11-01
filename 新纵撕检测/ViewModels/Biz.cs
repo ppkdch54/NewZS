@@ -14,6 +14,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Timers;
 using System.Windows.Forms;
+using System.Windows.Interop;
 using System.Windows.Media.Imaging;
 using 新纵撕检测.Models;
 
@@ -103,7 +104,6 @@ namespace 新纵撕检测.ViewModels
         private SerialComm serialComm;
         Random random = new Random();
 
-        private PictureBox pictureBox;
         private PropertyGrid propertyGrid;
 
         private int currentLoopCount;
@@ -142,25 +142,29 @@ namespace 新纵撕检测.ViewModels
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("SelectedAlarmIndex"));
             }
         }
+        private MainWindow window;
+        private int m_hCamera;
+        private ColorPalette m_GrayPal;
+        private tSdkCameraDevInfo m_DevInfo;
+        private int DispCount;
 
         public Biz(MainWindow mainWindow)
         {
-            pictureBox = mainWindow.PreviewBox;
             propertyGrid = mainWindow.PropertyGrid;
+            window = mainWindow;
             LoadParams();
             propertyGrid.SelectedObject = DetectParam;
             serialComm = new SerialComm(SerialParam, DetectParam.CameraNo);
             AlarmRecord.TotalLoopCount = AlarmParam.TotalLoopCount;
-
+            m_FrameCallback = new pfnCameraGrabberFrameCallback(CameraGrabberFrameCallback);
             if (InitCamera())
             {
-                mainWindow.imageC.Visibility = System.Windows.Visibility.Collapsed;
                 mainWindow.RectBorder.Visibility = System.Windows.Visibility.Collapsed;
+                GPIO.Init(m_hCamera);
             }
             else
             {
                 InitLocalCamera();
-                mainWindow.pbFormhost.Visibility = System.Windows.Visibility.Collapsed;
             }
 
             StartDetect();
@@ -358,9 +362,10 @@ namespace 新纵撕检测.ViewModels
                 {
                     while(true)
                     {
-                        Console.WriteLine("计算: "+ FrameCount + " 采集: "+ CapCount + " 图片队列: " + ImageQueue.Count);
+                        Console.WriteLine("计算: "+ FrameCount + " 采集: "+ CapCount +"显示: " + DispCount + " 图片队列: " + ImageQueue.Count);
                         FrameCount = 0;
                         CapCount = 0;
+                        DispCount = 0;
                         CurrentLoopCount = serialComm.LoopCount;
                         Thread.Sleep(1000);
                     }
@@ -634,55 +639,108 @@ namespace 新纵撕检测.ViewModels
 
         private bool InitCamera()
         {
-            tSdkCameraDevInfo[] m_DevInfo = new tSdkCameraDevInfo[] { new tSdkCameraDevInfo() };
-            m_FrameCallback = new pfnCameraGrabberFrameCallback(CameraGrabberFrameCallback);
-            MvApi.CameraEnumerateDevice(out m_DevInfo);
-            if (m_DevInfo != null)
+            CameraSdkStatus status = 0;
+
+            tSdkCameraDevInfo[] DevList;
+            MvApi.CameraEnumerateDevice(out DevList);
+            int NumDev = (DevList != null ? DevList.Length : 0);
+            if (NumDev < 1)
             {
-                m_Grabber = new IntPtr();
-                int hCamera = 0;
+                System.Windows.MessageBox.Show("未扫描到相机");
+                return false;
+            }
+            else if (NumDev == 1)
+            {
+                status = MvApi.CameraGrabber_Create(out m_Grabber, ref DevList[0]);
+            }
+            else
+            {
+                status = MvApi.CameraGrabber_CreateFromDevicePage(out m_Grabber);
+            }
+
+            if (status == 0)
+            {
+                MvApi.CameraGrabber_GetCameraDevInfo(m_Grabber, out m_DevInfo);
+                MvApi.CameraGrabber_GetCameraHandle(m_Grabber, out m_hCamera);
+
+                var handle = (new WindowInteropHelper(window)).Handle;
+                MvApi.CameraCreateSettingPage(m_hCamera, handle, m_DevInfo.acFriendlyName, null, (IntPtr)0, 0);
                 
-                if (MvApi.CameraGrabber_Create(out m_Grabber, ref m_DevInfo[0]) == CameraSdkStatus.CAMERA_STATUS_SUCCESS)
+                MvApi.CameraGrabber_SetRGBCallback(m_Grabber, m_FrameCallback, IntPtr.Zero);
+
+                // 黑白相机设置ISP输出灰度图像
+                // 彩色相机ISP默认会输出BGR24图像
+                tSdkCameraCapbility cap;
+                MvApi.CameraGetCapability(m_hCamera, out cap);
+                if (cap.sIspCapacity.bMonoSensor != 0)
                 {
-                    MvApi.CameraGrabber_GetCameraHandle(m_Grabber, out hCamera);
-                    GPIO.Init(hCamera);
-                    MvApi.CameraGrabber_SetRGBCallback(m_Grabber, m_FrameCallback, IntPtr.Zero);
+                    MvApi.CameraSetIspOutFormat(m_hCamera, (uint)MVSDK.emImageFormat.CAMERA_MEDIA_TYPE_MONO8);
 
-                    // 黑白相机设置ISP输出灰度图像
-                    // 彩色相机ISP默认会输出BGR24图像
-                    tSdkCameraCapbility cap;
-                    
-                    MvApi.CameraGetCapability(hCamera, out cap);
-
-                    // 设置相机预设分辨率
-                    tSdkImageResolution t;
-                    MvApi.CameraGetImageResolution(hCamera, out t);
-                    t.iIndex = 8;//切换预设分辨率， 只需要设定index值就行了。640*480 mono bin
-                    MvApi.CameraSetImageResolution(hCamera, ref t);
-
-                    if (cap.sIspCapacity.bMonoSensor != 0)
-                        MvApi.CameraSetIspOutFormat(hCamera, (uint)MVSDK.emImageFormat.CAMERA_MEDIA_TYPE_MONO8);
-                    MvApi.CameraGrabber_SetHWnd(m_Grabber, pictureBox.Handle);
+                    // 创建灰度调色板
+                    Bitmap Image = new Bitmap(1, 1, System.Drawing.Imaging.PixelFormat.Format8bppIndexed);
+                    m_GrayPal = Image.Palette;
+                    for (int Y = 0; Y < m_GrayPal.Entries.Length; Y++)
+                        m_GrayPal.Entries[Y] = System.Drawing.Color.FromArgb(255, Y, Y, Y);
                 }
-                if (m_Grabber != IntPtr.Zero)
-                    MvApi.CameraGrabber_StartLive(m_Grabber);
+
+                // 设置VFlip，由于SDK输出的数据默认是从底到顶的，打开VFlip后就可以直接转换为Bitmap
+                MvApi.CameraSetMirror(m_hCamera, 1, 1);
+
+
+                // 设置相机预设分辨率
+                tSdkImageResolution t;
+                MvApi.CameraGetImageResolution(m_hCamera, out t);
+                t.iIndex = 8;//切换预设分辨率， 只需要设定index值就行了。640*480 mono bin
+                MvApi.CameraSetImageResolution(m_hCamera, ref t);
+
+                // 为了演示如何在回调中使用相机数据创建Bitmap并显示到PictureBox中，这里不使用SDK内置的绘制操作
+                //MvApi.CameraGrabber_SetHWnd(m_Grabber, this.DispWnd.Handle);
+
+                MvApi.CameraGrabber_StartLive(m_Grabber);
                 return true;
+            }
+            else
+            {
+                System.Windows.MessageBox.Show(String.Format("打开相机失败，原因：{0}", status));
             }
             return false;
         }
 
         private void CameraGrabberFrameCallback(IntPtr Grabber, IntPtr pFrameBuffer, ref tSdkFrameHead pFrameHead, IntPtr Context)
         {
+            int w = pFrameHead.iWidth;
+            int h = pFrameHead.iHeight;
+            bool gray = (pFrameHead.uiMediaType == (uint)emImageFormat.CAMERA_MEDIA_TYPE_MONO8);
+            Bitmap ImageDisp = new Bitmap(w, h,
+                gray ? w : w * 3,
+                gray ? PixelFormat.Format8bppIndexed : PixelFormat.Format24bppRgb,
+                pFrameBuffer);
+
+            // 如果是灰度图要设置调色板
+            if (gray)
+            {
+                ImageDisp.Palette = m_GrayPal;
+            }
+
+            using (var stream = new MemoryStream())
+            {
+                ImageDisp.Save(stream, ImageFormat.Bmp);
+                App.Current.Dispatcher.InvokeAsync(new Action(() =>
+                {
+                    SetPreviewImage(stream);
+                }));
+            }
+
             if (DetectFlag)
             {
-                using (Image image = MvApi.CSharpImageFromFrame(pFrameBuffer, ref pFrameHead))
-                {
-                    Image.Bitmap = (Bitmap)image;
-                    ImageQueue.Enqueue(Image);
-                    CapCount++;
-                }
+                Image.Bitmap = ImageDisp;
+                ImageQueue.Enqueue(Image);
+                CapCount++;
             }
         }
+
+        [System.Runtime.InteropServices.DllImport("gdi32")]
+        static extern int DeleteObject(IntPtr o);
 
         private void Hooks_DispatcherInactive(object sender, EventArgs e)
         {
@@ -711,6 +769,7 @@ namespace 新纵撕检测.ViewModels
             PreviewImage.StreamSource = new MemoryStream(stream.ToArray());
             PreviewImage.EndInit();
             this.PreviewImage = PreviewImage;
+            DispCount++;
         }
 
         public void DrawRectOnScreen(double posX, double posY)
@@ -732,10 +791,10 @@ namespace 新纵撕检测.ViewModels
                     break;
             }
             App.Current?.Dispatcher?.Invoke(() => {
-                if (pictureBox!=null)
-                {
-                    Graphics.FromHwnd(pictureBox.Handle).DrawRectangle(pen, rect);//paintHandle对象提供了画图形的方法，我们只需调用即可
-                }
+                //if (pictureBox!=null)
+                //{
+                //    Graphics.FromHwnd(pictureBox.Handle).DrawRectangle(pen, rect);//paintHandle对象提供了画图形的方法，我们只需调用即可
+                //}
             });
         }
 
